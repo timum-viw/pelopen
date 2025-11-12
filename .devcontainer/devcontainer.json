@@ -1,0 +1,55 @@
+{
+	"name": "Grupetto Android Dev",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	
+	// Features to add to the dev container
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {}
+	},
+
+	// Post-create command to set up Gradle wrapper permissions
+	"postCreateCommand": "chmod +x gradlew || true",
+	
+	// Environment variables
+	"remoteEnv": {
+		"ANDROID_HOME": "/opt/android-sdk",
+		"ANDROID_SDK_ROOT": "/opt/android-sdk",
+		"PATH": "${containerEnv:PATH}:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin",
+		"JAVA_HOME": "/usr/lib/jvm/java-17-amazon-corretto"
+	},
+	
+	// Mount the workspace
+	"workspaceFolder": "/workspaces/grupetto",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/grupetto,type=bind",
+	
+	// VS Code customizations
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"mathiasfrohlich.Kotlin",
+				"fwcd.kotlin",
+				"vscjava.vscode-gradle",
+				"naco-siren.gradle-language-support",
+				"redhat.java",
+				"vscjava.vscode-java-pack"
+			],
+			"settings": {
+				"java.configuration.runtimes": [
+					{
+						"name": "JavaSE-17",
+						"path": "/usr/lib/jvm/java-17-amazon-corretto"
+					}
+				],
+				"java.home": "/usr/lib/jvm/java-17-amazon-corretto",
+				"gradle.nestedProjects": true
+			}
+		}
+	},
+	
+	// Container user
+	"remoteUser": "root"
+}
+

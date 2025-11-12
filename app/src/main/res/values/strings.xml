@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pelopen</string>
+    <string name="power_label">Power (W)</string>
+    <string name="cadence_label">Cadence (RPM)</string>
+    <string name="resistance_label">Resistance</string>
+    <string name="speed_label">Speed (m/s)</string>
+    <string name="sensor_status">Sensor Status</string>
+    <string name="not_available">N/A</string>
+</resources>
+
