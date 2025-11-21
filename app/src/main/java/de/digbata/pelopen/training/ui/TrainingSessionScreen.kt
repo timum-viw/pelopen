@@ -104,6 +104,16 @@ fun TrainingSessionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Training Session Name
+            workoutPlan?.let { plan ->
+                Text(
+                    text = plan.name ?: plan.workoutId,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
             // Timer Display - Large, prominent
             Text(
                 text = formatTime(totalRemainingTime),
@@ -122,7 +132,8 @@ fun TrainingSessionScreen(
             if (intervals.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     intervals.forEachIndexed { index, _ ->
                         val isCurrentInterval = index == currentIntervalIndex

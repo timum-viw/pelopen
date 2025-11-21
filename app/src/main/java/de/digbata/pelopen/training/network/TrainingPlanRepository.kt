@@ -149,6 +149,8 @@ class TrainingPlanRepository {
         
         return WorkoutPlan(
             workoutId = "mock-${System.currentTimeMillis()}",
+            name = "Mock Workout ${durationSeconds / 60}min Intensity $intensity",
+            description = "A mock training session for testing",
             totalDurationSeconds = durationSeconds,
             intensityLevel = intensity,
             intervals = intervals,
@@ -166,6 +168,8 @@ class TrainingPlanRepository {
      */
     private fun parseWorkoutPlan(json: JSONObject): WorkoutPlan {
         val workoutId = json.getString("workout_id")
+        val name = if (json.has("name") && !json.isNull("name")) json.getString("name") else null
+        val description = if (json.has("description") && !json.isNull("description")) json.getString("description") else null
         val totalDurationSeconds = json.getInt("total_duration_seconds")
         val intensityLevel = json.getInt("intensity_level")
         
@@ -186,6 +190,8 @@ class TrainingPlanRepository {
         
         return WorkoutPlan(
             workoutId = workoutId,
+            name = name,
+            description = description,
             totalDurationSeconds = totalDurationSeconds,
             intensityLevel = intensityLevel,
             intervals = intervals,
