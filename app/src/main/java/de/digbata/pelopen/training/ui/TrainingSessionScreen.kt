@@ -3,10 +3,12 @@ package de.digbata.pelopen.training.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -15,6 +17,8 @@ import de.digbata.pelopen.R
 import de.digbata.pelopen.training.TargetStatus
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import de.digbata.pelopen.training.data.WorkoutInterval
 import androidx.activity.compose.BackHandler
 import de.digbata.pelopen.training.TrainingSessionState
@@ -45,6 +49,12 @@ fun TrainingSessionScreen(
     val resistanceStatus by viewModel.resistanceStatus.collectAsState()
     val sessionProgress by viewModel.sessionProgress.collectAsState()
     val showIntervalNotification by viewModel.showIntervalChangeNotification.collectAsState()
+    
+    // Get workout plan and current interval index from active state
+    val activeState = sessionState as? TrainingSessionState.Active
+    val workoutPlan = activeState?.workoutPlan
+    val currentIntervalIndex = activeState?.currentIntervalIndex ?: 0
+    val intervals = workoutPlan?.intervals ?: emptyList()
     
     // Collect sensor values
     LaunchedEffect(sensorInterface) {
@@ -108,105 +118,74 @@ fun TrainingSessionScreen(
                 modifier = Modifier.fillMaxWidth().height(8.dp)
             )
             
-            // Current Interval Info
-            currentInterval?.let { interval ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = interval.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+            // Interval Dots - One dot for each interval
+            if (intervals.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    intervals.forEachIndexed { index, _ ->
+                        val isCurrentInterval = index == currentIntervalIndex
+                        Box(
+                            modifier = Modifier
+                                .size(if (isCurrentInterval) 12.dp else 8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isCurrentInterval) 
+                                        Color(0xFF4CAF50) // Green for current interval
+                                    else 
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                )
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Interval Time: ${formatTime(intervalRemainingTime)}",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        interval.notes?.let {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        if (index < intervals.size - 1) {
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
                     }
                 }
             }
             
-            // Cadence Display
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Cadence",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val interval: WorkoutInterval? = currentInterval
-                    if (interval != null) {
+            // Current and Next Interval - Side by Side
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Current Interval Info
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
                         Text(
-                            text = "Target: ${interval.targetCadence.min.toInt()}-${interval.targetCadence.max.toInt()} ${interval.targetCadence.unit}",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "Current Interval",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        currentInterval?.let { interval ->
+                            Text(
+                                text = interval.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Time: ${formatTime(intervalRemainingTime)}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            interval.notes?.let {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                    val cadenceUnit = interval?.targetCadence?.unit ?: "RPM"
-                    Text(
-                        text = "${cadence.toInt()} $cadenceUnit",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = getStatusColor(cadenceStatus)
-                    )
-                    Text(
-                        text = getStatusText(cadenceStatus),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = getStatusColor(cadenceStatus)
-                    )
                 }
-            }
-            
-            // Resistance Display
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Resistance",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val resistanceInterval: WorkoutInterval? = currentInterval
-                    if (resistanceInterval != null) {
-                        Text(
-                            text = "Target: ${resistanceInterval.targetResistance.min.toInt()}-${resistanceInterval.targetResistance.max.toInt()}${resistanceInterval.targetResistance.unit}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    val resistanceUnit = resistanceInterval?.targetResistance?.unit ?: "%"
-                    Text(
-                        text = "${resistance.toInt()}$resistanceUnit",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = getStatusColor(resistanceStatus)
-                    )
-                    Text(
-                        text = getStatusText(resistanceStatus),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = getStatusColor(resistanceStatus)
-                    )
-                }
-            }
-            
-            // Next Interval Preview
-            nextInterval?.let { next ->
+                
+                // Next Interval Preview
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
@@ -219,17 +198,100 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        nextInterval?.let { next ->
+                            Text(
+                                text = next.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Duration: ${formatTime(next.durationSeconds.toLong())}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            next.notes?.let { notes ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = notes,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Cadence and Resistance Display - Side by Side
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Cadence Display
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
                         Text(
-                            text = next.name,
-                            style = MaterialTheme.typography.bodyLarge
+                            text = "Cadence",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val interval: WorkoutInterval? = currentInterval
+                        if (interval != null) {
+                            Text(
+                                text = "${interval.targetCadence.min.toInt()}-${interval.targetCadence.max.toInt()} ${interval.targetCadence.unit}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        val cadenceUnit = interval?.targetCadence?.unit ?: "RPM"
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${cadence.toInt()} $cadenceUnit",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = getStatusColor(cadenceStatus)
                         )
                         Text(
-                            text = "Cadence: ${next.targetCadence.min.toInt()}-${next.targetCadence.max.toInt()} ${next.targetCadence.unit}",
-                            style = MaterialTheme.typography.bodySmall
+                            text = getStatusText(cadenceStatus),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = getStatusColor(cadenceStatus)
+                        )
+                    }
+                }
+                
+                // Resistance Display
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Resistance",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val resistanceInterval: WorkoutInterval? = currentInterval
+                        if (resistanceInterval != null) {
+                            Text(
+                                text = "${resistanceInterval.targetResistance.min.toInt()}-${resistanceInterval.targetResistance.max.toInt()} ${resistanceInterval.targetResistance.unit}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        val resistanceUnit = resistanceInterval?.targetResistance?.unit ?: "%"
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${resistance.toInt()} $resistanceUnit",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = getStatusColor(resistanceStatus)
                         )
                         Text(
-                            text = "Resistance: ${next.targetResistance.min.toInt()}-${next.targetResistance.max.toInt()}${next.targetResistance.unit}",
-                            style = MaterialTheme.typography.bodySmall
+                            text = getStatusText(resistanceStatus),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = getStatusColor(resistanceStatus)
                         )
                     }
                 }
@@ -242,7 +304,6 @@ fun TrainingSessionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                val activeState = sessionState as? TrainingSessionState.Active
                 if (activeState != null) {
                     val isPaused = activeState.isPaused
                     Button(
