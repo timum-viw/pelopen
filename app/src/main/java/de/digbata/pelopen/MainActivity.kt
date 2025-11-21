@@ -14,7 +14,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.activity.compose.BackHandler
 import com.spop.peloton.sensors.DeadSensorDetector
+import de.digbata.pelopen.navigation.AppTab
+import de.digbata.pelopen.navigation.Screen
+import de.digbata.pelopen.training.TrainingSessionViewModel
+import de.digbata.pelopen.training.TrainingSessionState
+import de.digbata.pelopen.training.ui.SessionSummaryScreen
+import de.digbata.pelopen.training.ui.TrainingConfigScreen
+import de.digbata.pelopen.training.ui.TrainingSessionScreen
 import com.spop.peloton.sensors.interfaces.DummySensorInterface
 import com.spop.peloton.sensors.interfaces.PelotonBikePlusSensorInterface
 import com.spop.peloton.sensors.interfaces.PelotonBikeSensorInterfaceV1New
@@ -60,7 +72,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SensorDisplayScreen(sensorInterface!!)
+                    MainActivityContent(sensorInterface = sensorInterface!!)
                 }
             }
         }
@@ -189,6 +201,107 @@ fun SensorCard(label: String, value: Float, unit: String) {
                 fontWeight = FontWeight.Bold,
                 fontSize = 32.sp
             )
+        }
+    }
+}
+
+@Composable
+fun MainActivityContent(sensorInterface: SensorInterface) {
+    val navController = rememberNavController()
+    var selectedTab by remember { mutableStateOf(AppTab.SENSORS) }
+    
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Tab navigation
+        TabRow(selectedTabIndex = selectedTab.ordinal) {
+            Tab(
+                selected = selectedTab == AppTab.SENSORS,
+                onClick = { selectedTab = AppTab.SENSORS },
+                text = { Text("Sensors") }
+            )
+            Tab(
+                selected = selectedTab == AppTab.TRAINING,
+                onClick = { selectedTab = AppTab.TRAINING },
+                text = { Text("Training") }
+            )
+        }
+        
+        // Show appropriate content based on selected tab
+        when (selectedTab) {
+            AppTab.SENSORS -> {
+                SensorDisplayScreen(sensorInterface = sensorInterface)
+            }
+            AppTab.TRAINING -> {
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.TrainingConfig.route
+                ) {
+                    composable(Screen.TrainingConfig.route) {
+                        TrainingConfigScreen(
+                            sensorInterface = sensorInterface,
+                            onStartSession = {
+                                navController.navigate(Screen.TrainingSession.route)
+                            }
+                        )
+                    }
+                    
+                    composable(Screen.TrainingSession.route) {
+                        val viewModel: TrainingSessionViewModel = viewModel()
+                        var showExitDialog by remember { mutableStateOf(false) }
+                        val sessionState by viewModel.sessionState.collectAsState()
+                        val isSessionActive = sessionState is TrainingSessionState.Active
+                        
+                        // Handle back navigation
+                        BackHandler(enabled = isSessionActive) {
+                            showExitDialog = true
+                        }
+                        
+                        if (showExitDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showExitDialog = false },
+                                title = { Text("End Training Session?") },
+                                text = { Text("Your progress will be lost.") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.endSession()
+                                        navController.popBackStack()
+                                        showExitDialog = false
+                                    }) {
+                                        Text("End")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showExitDialog = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
+                        }
+                        
+                        TrainingSessionScreen(
+                            sensorInterface = sensorInterface,
+                            viewModel = viewModel,
+                            onEndSession = {
+                                navController.navigate(Screen.SessionSummary.route)
+                            }
+                        )
+                    }
+                    
+                    composable(Screen.SessionSummary.route) {
+                        val viewModel: TrainingSessionViewModel = viewModel()
+                        SessionSummaryScreen(
+                            viewModel = viewModel,
+                            onStartNewSession = {
+                                navController.navigate(Screen.TrainingConfig.route) {
+                                    popUpTo(Screen.TrainingConfig.route) { inclusive = true }
+                                }
+                            },
+                            onBackToSensors = {
+                                selectedTab = AppTab.SENSORS
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
