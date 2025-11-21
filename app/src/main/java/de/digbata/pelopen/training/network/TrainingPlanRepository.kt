@@ -32,6 +32,7 @@ class TrainingPlanRepository {
      */
     suspend fun fetchWorkoutPlan(durationSeconds: Int, intensity: Int): Result<WorkoutPlan> {
         return withContext(Dispatchers.IO) {
+            var connection: HttpURLConnection? = null
             try {
                 // Use mock data for testing
                 if (USE_MOCK_DATA) {
@@ -43,28 +44,53 @@ class TrainingPlanRepository {
                 // Build URL with query parameters
                 val urlString = "$BASE_URL?duration_seconds=$durationSeconds&intensity=$intensity"
                 val url = URL(urlString)
+                // Log with both Timber and Android Log for debugging
+                android.util.Log.d("TrainingPlanRepo", "Fetching: $urlString")
                 Timber.d("Fetching workout plan from: $urlString")
-                val connection = url.openConnection() as HttpURLConnection
+                
+                connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000 // 10 seconds
                 connection.readTimeout = 10000
+                connection.doInput = true
                 
+                // Establish connection
+                connection.connect()
                 val responseCode = connection.responseCode
+                Timber.d("Connected to server, response code: $responseCode")
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     val inputStream = connection.inputStream
                     val response = inputStream.bufferedReader().use { it.readText() }
+                    Timber.d("Response received: ${response.take(200)}...")
                     val jsonObject = JSONObject(response)
                     
                     // Parse JSON to WorkoutPlan
                     val workoutPlan = parseWorkoutPlan(jsonObject)
+                    Timber.d("Successfully parsed workout plan with ${workoutPlan.intervals.size} intervals")
                     Result.success(workoutPlan)
                 } else {
-                    Timber.e("HTTP error: $responseCode")
-                    Result.failure(Exception("HTTP $responseCode"))
+                    // Try to read error stream
+                    val errorStream = connection.errorStream
+                    val errorResponse = errorStream?.bufferedReader()?.use { it.readText() } ?: "No error details"
+                    Timber.e("HTTP error: $responseCode, response: $errorResponse")
+                    Result.failure(Exception("HTTP $responseCode: $errorResponse"))
                 }
+            } catch (e: java.net.ConnectException) {
+                Timber.e(e, "Failed to connect to server at $BASE_URL - is the server running?")
+                Result.failure(Exception("Cannot connect to server. Check if server is running at $BASE_URL"))
+            } catch (e: java.net.SocketTimeoutException) {
+                Timber.e(e, "Connection timeout to $BASE_URL")
+                Result.failure(Exception("Connection timeout. Server may be slow or unreachable."))
             } catch (e: Exception) {
-                Timber.e(e, "Failed to fetch workout plan")
+                Timber.e(e, "Failed to fetch workout plan: ${e.message}")
                 Result.failure(e)
+            } finally {
+                // Ensure connection is disconnected
+                try {
+                    connection?.disconnect()
+                } catch (e: Exception) {
+                    // Ignore
+                }
             }
         }
     }

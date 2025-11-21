@@ -83,24 +83,30 @@ class TrainingSessionViewModel(
     fun startSession(durationSeconds: Int, intensity: Int) {
         viewModelScope.launch {
             _sessionState.value = TrainingSessionState.Loading
+            Timber.d("Starting training session: duration=$durationSeconds, intensity=$intensity")
             
             repository.fetchWorkoutPlan(durationSeconds, intensity)
                 .onSuccess { workoutPlan ->
+                    Timber.d("Workout plan loaded: ${workoutPlan.intervals.size} intervals, total duration=${workoutPlan.totalDurationSeconds}s")
                     currentWorkoutPlan = workoutPlan
                     currentIntervalIndex = 0
+                    
+                    // Update current and next intervals BEFORE starting timer
+                    updateIntervals()
+                    Timber.d("Updated intervals: current=${_currentInterval.value?.name}, next=${_nextInterval.value?.name}")
+                    
                     _sessionState.value = TrainingSessionState.Active(
                         workoutPlan = workoutPlan,
                         currentIntervalIndex = 0,
                         isPaused = false
                     )
                     
-                    // Update current and next intervals
-                    updateIntervals()
-                    
-                    // Start timer
+                    // Start timer AFTER intervals are set
                     startTimer(workoutPlan.totalDurationSeconds)
+                    Timber.d("Timer started for ${workoutPlan.totalDurationSeconds}s")
                 }
                 .onFailure { error ->
+                    Timber.e(error, "Failed to load workout plan")
                     _sessionState.value = TrainingSessionState.Error(error.message ?: "Failed to load workout plan")
                 }
         }
@@ -115,6 +121,15 @@ class TrainingSessionViewModel(
         isPaused = false
         pausedElapsedTime = 0
         intervalPausedTime = 0
+        
+        // Set initial remaining time immediately
+        _totalRemainingTimeSeconds.value = totalDurationSeconds.toLong()
+        _sessionProgress.value = 0f
+        
+        // Set initial interval remaining time
+        _currentInterval.value?.let { workoutInterval ->
+            _currentIntervalRemainingSeconds.value = workoutInterval.durationSeconds.toLong()
+        }
         
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -131,10 +146,9 @@ class TrainingSessionViewModel(
                     _sessionProgress.value = progress
                     
                     // Calculate current interval remaining time
-                    val currentInterval = _currentInterval.value
-                    if (currentInterval != null) {
+                    _currentInterval.value?.let { workoutInterval ->
                         val intervalElapsed = System.currentTimeMillis() - intervalStartTime
-                        val intervalRemaining = (currentInterval.durationSeconds * 1000) - intervalElapsed
+                        val intervalRemaining = (workoutInterval.durationSeconds * 1000) - intervalElapsed
                         _currentIntervalRemainingSeconds.value = maxOf(0, intervalRemaining / 1000)
                         
                         // Trigger interval transition immediately when time reaches 0
@@ -160,18 +174,30 @@ class TrainingSessionViewModel(
      * Update current and next intervals based on current index
      */
     private fun updateIntervals() {
-        val workoutPlan = currentWorkoutPlan ?: return
+        val workoutPlan = currentWorkoutPlan ?: run {
+            Timber.w("updateIntervals called but no workout plan available")
+            return
+        }
         val intervals = workoutPlan.intervals
         
         if (currentIntervalIndex < intervals.size) {
-            _currentInterval.value = intervals[currentIntervalIndex]
+            val workoutInterval = intervals[currentIntervalIndex]
+            _currentInterval.value = workoutInterval
+            Timber.d("Updated current interval to index $currentIntervalIndex: ${workoutInterval.name}, duration=${workoutInterval.durationSeconds}s")
+            
+            // Set initial interval remaining time
+            _currentIntervalRemainingSeconds.value = workoutInterval.durationSeconds.toLong()
             
             // Set next interval
             if (currentIntervalIndex + 1 < intervals.size) {
                 _nextInterval.value = intervals[currentIntervalIndex + 1]
+                Timber.d("Updated next interval: ${intervals[currentIntervalIndex + 1].name}")
             } else {
                 _nextInterval.value = null
+                Timber.d("No next interval - last interval")
             }
+        } else {
+            Timber.w("Current interval index $currentIntervalIndex is out of bounds (${intervals.size} intervals)")
         }
     }
     

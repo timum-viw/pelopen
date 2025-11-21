@@ -47,16 +47,24 @@ class MainActivity : ComponentActivity() {
             if (IsBikePlus) {
                 PelotonBikePlusSensorInterface(this).also { sensor ->
                     lifecycle.addObserver(object : DefaultLifecycleObserver {
+                        override fun onPause(owner: LifecycleOwner) {
+                            try { sensor.stop() } catch (e: Exception) {}
+                        }
                         override fun onDestroy(owner: LifecycleOwner) {
-                            sensor.stop()
+                            try { sensor.stop() } catch (e: Exception) {}
+                            lifecycle.removeObserver(this)
                         }
                     })
                 }
             } else {
                 PelotonBikeSensorInterfaceV1New(this).also { sensor ->
                     lifecycle.addObserver(object : DefaultLifecycleObserver {
+                        override fun onPause(owner: LifecycleOwner) {
+                            try { sensor.stop() } catch (e: Exception) {}
+                        }
                         override fun onDestroy(owner: LifecycleOwner) {
-                            sensor.stop()
+                            try { sensor.stop() } catch (e: Exception) {}
+                            lifecycle.removeObserver(this)
                         }
                     })
                 }
@@ -78,17 +86,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Stop sensor early to prevent ServiceConnectionLeaked
+        stopSensorInterface()
+    }
+
     override fun onDestroy() {
+        // Ensure sensor is stopped before activity is destroyed
+        stopSensorInterface()
+        sensorInterface = null
         super.onDestroy()
+    }
+    
+    private fun stopSensorInterface() {
         sensorInterface?.let {
             if (it !is DummySensorInterface) {
-                // DummySensorInterface doesn't need to be stopped
-                // but real interfaces do
                 try {
-                    (it as? PelotonBikeSensorInterfaceV1New)?.stop()
-                    (it as? PelotonBikePlusSensorInterface)?.stop()
+                    when (it) {
+                        is PelotonBikeSensorInterfaceV1New -> it.stop()
+                        is PelotonBikePlusSensorInterface -> it.stop()
+                    }
                 } catch (e: Exception) {
-                    // Ignore
+                    // Ignore cleanup errors
                 }
             }
         }
@@ -231,6 +251,9 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                 SensorDisplayScreen(sensorInterface = sensorInterface)
             }
             AppTab.TRAINING -> {
+                // Share ViewModel across all training screens
+                val trainingViewModel: TrainingSessionViewModel = viewModel(key = "training_session")
+                
                 NavHost(
                     navController = navController,
                     startDestination = Screen.TrainingConfig.route
@@ -238,6 +261,7 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                     composable(Screen.TrainingConfig.route) {
                         TrainingConfigScreen(
                             sensorInterface = sensorInterface,
+                            viewModel = trainingViewModel,
                             onStartSession = {
                                 navController.navigate(Screen.TrainingSession.route)
                             }
@@ -245,9 +269,8 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                     }
                     
                     composable(Screen.TrainingSession.route) {
-                        val viewModel: TrainingSessionViewModel = viewModel()
                         var showExitDialog by remember { mutableStateOf(false) }
-                        val sessionState by viewModel.sessionState.collectAsState()
+                        val sessionState by trainingViewModel.sessionState.collectAsState()
                         val isSessionActive = sessionState is TrainingSessionState.Active
                         
                         // Handle back navigation
@@ -262,7 +285,7 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                                 text = { Text("Your progress will be lost.") },
                                 confirmButton = {
                                     TextButton(onClick = {
-                                        viewModel.endSession()
+                                        trainingViewModel.endSession()
                                         navController.popBackStack()
                                         showExitDialog = false
                                     }) {
@@ -279,7 +302,7 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                         
                         TrainingSessionScreen(
                             sensorInterface = sensorInterface,
-                            viewModel = viewModel,
+                            viewModel = trainingViewModel,
                             onEndSession = {
                                 navController.navigate(Screen.SessionSummary.route)
                             }
@@ -287,9 +310,8 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                     }
                     
                     composable(Screen.SessionSummary.route) {
-                        val viewModel: TrainingSessionViewModel = viewModel()
                         SessionSummaryScreen(
-                            viewModel = viewModel,
+                            viewModel = trainingViewModel,
                             onStartNewSession = {
                                 navController.navigate(Screen.TrainingConfig.route) {
                                     popUpTo(Screen.TrainingConfig.route) { inclusive = true }

@@ -15,7 +15,7 @@ import de.digbata.pelopen.training.TrainingSessionViewModel
  */
 @Composable
 fun SessionSummaryScreen(
-    viewModel: TrainingSessionViewModel = viewModel(),
+    viewModel: TrainingSessionViewModel,
     onStartNewSession: () -> Unit = {},
     onBackToSensors: () -> Unit = {}
 ) {

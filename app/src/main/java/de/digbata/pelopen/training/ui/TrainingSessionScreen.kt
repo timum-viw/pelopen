@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun TrainingSessionScreen(
     sensorInterface: SensorInterface,
-    viewModel: TrainingSessionViewModel = viewModel(),
+    viewModel: TrainingSessionViewModel,
     onEndSession: () -> Unit = {}
 ) {
     var cadence by remember { mutableStateOf(0f) }

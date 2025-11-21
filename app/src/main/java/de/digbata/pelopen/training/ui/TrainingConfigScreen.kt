@@ -22,7 +22,7 @@ import com.spop.peloton.sensors.interfaces.SensorInterface
 @Composable
 fun TrainingConfigScreen(
     sensorInterface: SensorInterface, // Keep for future use
-    viewModel: TrainingSessionViewModel = viewModel(),
+    viewModel: TrainingSessionViewModel,
     onStartSession: () -> Unit = {}
 ) {
     // sensorInterface kept for future use
