@@ -2,8 +2,7 @@ package de.digbata.pelopen.training
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.digbata.pelopen.training.data.WorkoutInterval
-import de.digbata.pelopen.training.data.WorkoutPlan
+import de.digbata.pelopen.training.data.*
 import de.digbata.pelopen.training.network.TrainingPlanRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -70,12 +69,16 @@ class TrainingSessionViewModel(
     private var intervalPausedTime: Long = 0
     private var isPaused: Boolean = false
     private var timerJob: Job? = null
+    private var dataCollectionJob: Job? = null
     private var currentWorkoutPlan: WorkoutPlan? = null
     private var currentIntervalIndex: Int = 0
     
     // Sensor values
     private var currentCadence: Float = 0f
     private var currentResistance: Float = 0f
+    
+    // Time-series data collection
+    private val sessionDataPoints = mutableListOf<SessionDataPoint>()
     
     /**
      * Start a new training session
@@ -91,6 +94,9 @@ class TrainingSessionViewModel(
                     currentWorkoutPlan = workoutPlan
                     currentIntervalIndex = 0
                     
+                    // Clear previous session data
+                    sessionDataPoints.clear()
+                    
                     // Update current and next intervals BEFORE starting timer
                     updateIntervals()
                     Timber.d("Updated intervals: current=${_currentInterval.value?.name}, next=${_nextInterval.value?.name}")
@@ -103,6 +109,8 @@ class TrainingSessionViewModel(
                     
                     // Start timer AFTER intervals are set
                     startTimer(workoutPlan.totalDurationSeconds)
+                    // Start data collection
+                    startDataCollection()
                     Timber.d("Timer started for ${workoutPlan.totalDurationSeconds}s")
                 }
                 .onFailure { error ->
@@ -270,11 +278,45 @@ class TrainingSessionViewModel(
     }
     
     /**
+     * Start data collection - samples sensor values every 1 second
+     */
+    private fun startDataCollection() {
+        dataCollectionJob?.cancel()
+        dataCollectionJob = viewModelScope.launch {
+            while (true) {
+                delay(1000) // Sample every 1 second
+                
+                if (!isPaused && _sessionState.value is TrainingSessionState.Active) {
+                    val currentInterval = _currentInterval.value
+                    if (currentInterval != null) {
+                        val sessionElapsed = System.currentTimeMillis() - sessionStartTime
+                        val intervalElapsed = System.currentTimeMillis() - intervalStartTime
+                        val intervalElapsedSeconds = (intervalElapsed / 1000).toInt()
+                        
+                        val dataPoint = SessionDataPoint(
+                            timestamp = sessionElapsed,
+                            cadence = currentCadence,
+                            resistance = currentResistance,
+                            intervalIndex = currentIntervalIndex,
+                            intervalElapsedSeconds = intervalElapsedSeconds
+                        )
+                        
+                        sessionDataPoints.add(dataPoint)
+                        Timber.v("Collected data point: cadence=${currentCadence}, resistance=${currentResistance}, interval=${currentIntervalIndex}")
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
      * End the session
      */
     fun endSession() {
         timerJob?.cancel()
         timerJob = null
+        dataCollectionJob?.cancel()
+        dataCollectionJob = null
         _sessionState.value = TrainingSessionState.Completed
     }
     
@@ -323,6 +365,193 @@ class TrainingSessionViewModel(
     }
     
     /**
+     * Get complete session performance data with aggregated statistics
+     */
+    fun getSessionPerformance(): SessionPerformance? {
+        val workoutPlan = currentWorkoutPlan ?: return null
+        val sessionEndTime = System.currentTimeMillis()
+        val actualDurationSeconds = ((sessionEndTime - sessionStartTime) / 1000).toInt()
+        
+        if (sessionDataPoints.isEmpty()) {
+            Timber.w("No data points collected for session")
+            return null
+        }
+        
+        // Group data points by interval index
+        val intervalsByIndex = sessionDataPoints.groupBy { it.intervalIndex }
+        
+        // Calculate performance for each interval
+        val intervalPerformances = workoutPlan.intervals.mapIndexed { index, interval ->
+            val intervalDataPoints = intervalsByIndex[index] ?: emptyList()
+            calculateIntervalPerformance(interval, intervalDataPoints, index)
+        }
+        
+        // Calculate overall weighted averages (longer intervals count more)
+        val totalWeight = intervalPerformances.sumOf { it.actualDurationSeconds.toLong() }
+        val overallCadenceFit = if (totalWeight > 0) {
+            intervalPerformances.sumOf { 
+                (it.cadenceTargetFit * it.actualDurationSeconds).toDouble()
+            }.toFloat() / totalWeight
+        } else 0f
+        
+        val overallResistanceFit = if (totalWeight > 0) {
+            intervalPerformances.sumOf { 
+                (it.resistanceTargetFit * it.actualDurationSeconds).toDouble()
+            }.toFloat() / totalWeight
+        } else 0f
+        
+        // Determine plan difficulty assessment
+        val planDifficultyAssessment = assessPlanDifficulty(intervalPerformances)
+        
+        return SessionPerformance(
+            workoutPlan = workoutPlan,
+            sessionStartTime = sessionStartTime,
+            sessionEndTime = sessionEndTime,
+            actualDurationSeconds = actualDurationSeconds,
+            intervals = intervalPerformances,
+            overallCadenceFit = overallCadenceFit,
+            overallResistanceFit = overallResistanceFit,
+            totalDataPoints = sessionDataPoints.size,
+            planDifficultyAssessment = planDifficultyAssessment
+        )
+    }
+    
+    /**
+     * Calculate performance metrics for a single interval
+     */
+    private fun calculateIntervalPerformance(
+        interval: WorkoutInterval,
+        dataPoints: List<SessionDataPoint>,
+        @Suppress("UNUSED_PARAMETER") intervalIndex: Int
+    ): IntervalPerformance {
+        if (dataPoints.isEmpty()) {
+            // No data for this interval - return default values
+            return IntervalPerformance(
+                interval = interval,
+                actualDurationSeconds = interval.durationSeconds,
+                dataPoints = emptyList(),
+                averageCadence = 0f,
+                averageResistance = 0f,
+                cadenceTargetFit = 0f,
+                resistanceTargetFit = 0f,
+                cadenceStatusSummary = emptyMap(),
+                resistanceStatusSummary = emptyMap(),
+                wasTooEasy = false,
+                wasTooHard = false,
+                wasAppropriate = false
+            )
+        }
+        
+        // Calculate actual duration from data points
+        val actualDurationSeconds = if (dataPoints.size > 1) {
+            val firstPoint = dataPoints.first()
+            val lastPoint = dataPoints.last()
+            ((lastPoint.timestamp - firstPoint.timestamp) / 1000).toInt() + 1
+        } else {
+            interval.durationSeconds
+        }
+        
+        // Calculate averages
+        val averageCadence = dataPoints.map { it.cadence }.average().toFloat()
+        val averageResistance = dataPoints.map { it.resistance }.average().toFloat()
+        
+        // Count status occurrences
+        val cadenceStatusCounts = mutableMapOf<TargetStatus, Int>().apply {
+            put(TargetStatus.WithinRange, 0)
+            put(TargetStatus.BelowMin, 0)
+            put(TargetStatus.AboveMax, 0)
+        }
+        val resistanceStatusCounts = mutableMapOf<TargetStatus, Int>().apply {
+            put(TargetStatus.WithinRange, 0)
+            put(TargetStatus.BelowMin, 0)
+            put(TargetStatus.AboveMax, 0)
+        }
+        
+        dataPoints.forEach { point ->
+            // Check cadence
+            val cadenceStatus = compareValue(
+                actual = point.cadence,
+                targetMin = interval.targetCadence.min,
+                targetMax = interval.targetCadence.max
+            )
+            val currentCadenceCount = cadenceStatusCounts[cadenceStatus] ?: 0
+            cadenceStatusCounts[cadenceStatus] = currentCadenceCount + 1
+            
+            // Check resistance
+            val resistanceStatus = compareValue(
+                actual = point.resistance,
+                targetMin = interval.targetResistance.min,
+                targetMax = interval.targetResistance.max
+            )
+            val currentResistanceCount = resistanceStatusCounts[resistanceStatus] ?: 0
+            resistanceStatusCounts[resistanceStatus] = currentResistanceCount + 1
+        }
+        
+        // Calculate compliance percentages
+        val totalPoints = dataPoints.size
+        val cadenceTargetFit = (cadenceStatusCounts[TargetStatus.WithinRange]?.toFloat() ?: 0f) / totalPoints * 100f
+        val resistanceTargetFit = (resistanceStatusCounts[TargetStatus.WithinRange]?.toFloat() ?: 0f) / totalPoints * 100f
+        
+        // Determine if interval was too easy, too hard, or appropriate
+        // Consider both cadence and resistance
+        val cadenceAboveCount = cadenceStatusCounts[TargetStatus.AboveMax] ?: 0
+        val cadenceBelowCount = cadenceStatusCounts[TargetStatus.BelowMin] ?: 0
+        val cadenceWithinCount = cadenceStatusCounts[TargetStatus.WithinRange] ?: 0
+        
+        val resistanceAboveCount = resistanceStatusCounts[TargetStatus.AboveMax] ?: 0
+        val resistanceBelowCount = resistanceStatusCounts[TargetStatus.BelowMin] ?: 0
+        val resistanceWithinCount = resistanceStatusCounts[TargetStatus.WithinRange] ?: 0
+        
+        // Combine cadence and resistance status
+        val totalAbove = cadenceAboveCount + resistanceAboveCount
+        val totalBelow = cadenceBelowCount + resistanceBelowCount
+        val totalWithin = cadenceWithinCount + resistanceWithinCount
+        val totalChecks = totalPoints * 2 // Each point has both cadence and resistance
+        
+        val wasTooEasy = (totalAbove.toFloat() / totalChecks) > 0.5f // More than 50% above targets
+        val wasTooHard = (totalBelow.toFloat() / totalChecks) > 0.5f // More than 50% below targets
+        val wasAppropriate = !wasTooEasy && !wasTooHard && (totalWithin.toFloat() / totalChecks) > 0.4f // At least 40% within targets
+        
+        return IntervalPerformance(
+            interval = interval,
+            actualDurationSeconds = actualDurationSeconds,
+            dataPoints = dataPoints,
+            averageCadence = averageCadence,
+            averageResistance = averageResistance,
+            cadenceTargetFit = cadenceTargetFit,
+            resistanceTargetFit = resistanceTargetFit,
+            cadenceStatusSummary = cadenceStatusCounts.toMap(),
+            resistanceStatusSummary = resistanceStatusCounts.toMap(),
+            wasTooEasy = wasTooEasy,
+            wasTooHard = wasTooHard,
+            wasAppropriate = wasAppropriate
+        )
+    }
+    
+    /**
+     * Assess overall plan difficulty based on interval performances
+     */
+    private fun assessPlanDifficulty(intervals: List<IntervalPerformance>): PlanDifficultyAssessment {
+        if (intervals.isEmpty()) return PlanDifficultyAssessment.MIXED
+        
+        val tooEasyCount = intervals.count { it.wasTooEasy }
+        val tooHardCount = intervals.count { it.wasTooHard }
+        val appropriateCount = intervals.count { it.wasAppropriate }
+        val totalIntervals = intervals.size
+        
+        val tooEasyRatio = tooEasyCount.toFloat() / totalIntervals
+        val tooHardRatio = tooHardCount.toFloat() / totalIntervals
+        val appropriateRatio = appropriateCount.toFloat() / totalIntervals
+        
+        return when {
+            appropriateRatio > 0.6f -> PlanDifficultyAssessment.APPROPRIATE
+            tooEasyRatio > 0.6f -> PlanDifficultyAssessment.TOO_EASY
+            tooHardRatio > 0.6f -> PlanDifficultyAssessment.TOO_HARD
+            else -> PlanDifficultyAssessment.MIXED
+        }
+    }
+    
+    /**
      * Dismiss interval change notification
      */
     fun dismissIntervalNotification() {
@@ -332,6 +561,8 @@ class TrainingSessionViewModel(
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
+        dataCollectionJob?.cancel()
+        sessionDataPoints.clear()
     }
 }
 
