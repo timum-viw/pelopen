@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import de.digbata.pelopen.training.data.WorkoutInterval
 import androidx.activity.compose.BackHandler
 import de.digbata.pelopen.training.TrainingSessionState
@@ -55,6 +56,13 @@ fun TrainingSessionScreen(
     val workoutPlan = activeState?.workoutPlan
     val currentIntervalIndex = activeState?.currentIntervalIndex ?: 0
     val intervals = workoutPlan?.intervals ?: emptyList()
+    
+    // Calculate previous interval
+    val previousInterval = if (currentIntervalIndex > 0) {
+        intervals.getOrNull(currentIntervalIndex - 1)
+    } else {
+        null
+    }
     
     // Collect sensor values
     LaunchedEffect(sensorInterface) {
@@ -155,11 +163,56 @@ fun TrainingSessionScreen(
                 }
             }
             
-            // Current and Next Interval - Side by Side
+            // Previous, Current and Next Interval - Side by Side
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Previous Interval
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .alpha(0.6f)
+                    ) {
+                        Text(
+                            text = "Previous Interval",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        previousInterval?.let { prev ->
+                            Text(
+                                text = prev.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Duration: ${formatTime(prev.durationSeconds.toLong())}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            prev.notes?.let { notes ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = notes,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } ?: Text(
+                            text = "—",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
                 // Current Interval Info
                 Card(modifier = Modifier.weight(1f)) {
                     Column(
@@ -198,11 +251,13 @@ fun TrainingSessionScreen(
                 Card(
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .alpha(0.6f)
                     ) {
                         Text(
                             text = "Next Interval",
@@ -229,7 +284,11 @@ fun TrainingSessionScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
+                        } ?: Text(
+                            text = "—",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
