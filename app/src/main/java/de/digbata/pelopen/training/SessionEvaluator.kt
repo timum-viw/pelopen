@@ -11,26 +11,22 @@ class SessionEvaluator {
     /**
      * Calculate session performance from raw data
      */
-    fun calculateSessionPerformance(
-        workoutPlan: WorkoutPlan,
-        sessionStartTime: Long,
-        sessionEndTime: Long,
-        dataPoints: List<SessionDataPoint>
-    ): SessionPerformance? {
-        if (dataPoints.isEmpty()) {
+    fun calculateSessionPerformance(trainingSession: TrainingSession): SessionPerformance? {
+        if (trainingSession.dataPoints.isEmpty()) {
             Timber.w("No data points collected for session")
             return null
         }
         
-        val actualDurationSeconds = ((sessionEndTime - sessionStartTime) / 1000).toInt()
+        val sessionEndTime = trainingSession.sessionEndTime.takeIf { it > 0 } ?: System.currentTimeMillis()
+        val actualDurationSeconds = ((sessionEndTime - trainingSession.sessionStartTime) / 1000).toInt() - trainingSession.pausedSeconds.toInt()
         
         // Group data points by interval index
-        val intervalsByIndex = dataPoints.groupBy { it.intervalIndex }
+        val intervalsByIndex = trainingSession.dataPoints.groupBy { it.intervalIndex }
         
         // Calculate performance for each interval
-        val intervalPerformances = workoutPlan.intervals.mapIndexed { index, interval ->
+        val intervalPerformances = trainingSession.workoutPlan.intervals.mapIndexed { index, interval ->
             val intervalDataPoints = intervalsByIndex[index] ?: emptyList()
-            calculateIntervalPerformance(interval, intervalDataPoints, index)
+            calculateIntervalPerformance(interval, intervalDataPoints)
         }
         
         // Calculate overall weighted averages (longer intervals count more)
@@ -51,14 +47,11 @@ class SessionEvaluator {
         val planDifficultyAssessment = assessPlanDifficulty(intervalPerformances)
         
         return SessionPerformance(
-            workoutPlan = workoutPlan,
-            sessionStartTime = sessionStartTime,
-            sessionEndTime = sessionEndTime,
+            trainingSession = trainingSession,
             actualDurationSeconds = actualDurationSeconds,
             intervals = intervalPerformances,
             overallCadenceFit = overallCadenceFit,
             overallResistanceFit = overallResistanceFit,
-            totalDataPoints = dataPoints.size,
             planDifficultyAssessment = planDifficultyAssessment
         )
     }
@@ -112,6 +105,7 @@ class SessionEvaluator {
     ): List<String> {
         val recommendations = mutableListOf<String>()
         val totalIntervals = performance.intervals.size
+        val totalDataPoints = performance.trainingSession.dataPoints.size
         
         when (performance.planDifficultyAssessment) {
             PlanDifficultyAssessment.TOO_EASY -> {
@@ -180,8 +174,7 @@ class SessionEvaluator {
      */
     private fun calculateIntervalPerformance(
         interval: WorkoutInterval,
-        dataPoints: List<SessionDataPoint>,
-        @Suppress("UNUSED_PARAMETER") intervalIndex: Int
+        dataPoints: List<SessionDataPoint>
     ): IntervalPerformance {
         if (dataPoints.isEmpty()) {
             // No data for this interval - return default values

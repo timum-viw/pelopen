@@ -20,7 +20,6 @@ fun SessionSummaryScreen(
     onStartNewSession: () -> Unit = {},
     onBackToSensors: () -> Unit = {}
 ) {
-    val summary = viewModel.getSessionSummary()
     val performance = remember { viewModel.getSessionPerformance() }
     
     Column(
@@ -35,27 +34,6 @@ fun SessionSummaryScreen(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )
-        
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (summary != null) {
-                    Text(
-                        text = "Session completed: ${summary.first} minutes, ${summary.second} intervals",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                } else {
-                    Text(
-                        text = "Session completed",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
-        }
         
         // Proof of Concept: Data Collection Stats
         if (performance != null) {
@@ -78,7 +56,7 @@ fun SessionSummaryScreen(
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
                     
                     Text(
-                        text = "Total Data Points: ${performance.totalDataPoints}",
+                        text = "Total Data Points: ${performance.trainingSession.dataPoints.size}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     

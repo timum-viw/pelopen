@@ -63,23 +63,21 @@ class TrainingSessionViewModel(
     private val _showIntervalChangeNotification = MutableStateFlow(false)
     val showIntervalChangeNotification: StateFlow<Boolean> = _showIntervalChangeNotification.asStateFlow()
     
+    // Session data
+    private var session: TrainingSession? = null
+    
     // Timer state
-    private var sessionStartTime: Long = 0
     private var intervalStartTime: Long = 0
-    private var pausedElapsedTime: Long = 0
-    private var intervalPausedTime: Long = 0
+    private var pauseStartTime: Long = 0 // When current pause started
+    private var intervalPauseStartTime: Long = 0 // When current interval pause started
     private var isPaused: Boolean = false
     private var timerJob: Job? = null
     private var dataCollectionJob: Job? = null
-    private var currentWorkoutPlan: WorkoutPlan? = null
     private var currentIntervalIndex: Int = 0
     
     // Sensor values
     private var currentCadence: Float = 0f
     private var currentResistance: Float = 0f
-    
-    // Time-series data collection
-    private val sessionDataPoints = mutableListOf<SessionDataPoint>()
     
     /**
      * Start a new training session
@@ -92,11 +90,14 @@ class TrainingSessionViewModel(
             repository.fetchWorkoutPlan(durationSeconds, intensity)
                 .onSuccess { workoutPlan ->
                     Timber.d("Workout plan loaded: ${workoutPlan.intervals.size} intervals, total duration=${workoutPlan.totalDurationSeconds}s")
-                    currentWorkoutPlan = workoutPlan
-                    currentIntervalIndex = 0
                     
-                    // Clear previous session data
-                    sessionDataPoints.clear()
+                    // Create new session
+                    val sessionStartTime = System.currentTimeMillis()
+                    session = TrainingSession(
+                        workoutPlan = workoutPlan,
+                        sessionStartTime = sessionStartTime
+                    )
+                    currentIntervalIndex = 0
                     
                     // Update current and next intervals BEFORE starting timer
                     updateIntervals()
@@ -125,11 +126,11 @@ class TrainingSessionViewModel(
      * Start the timer
      */
     private fun startTimer(totalDurationSeconds: Int) {
-        sessionStartTime = System.currentTimeMillis()
+        val currentSession = session ?: return
         intervalStartTime = System.currentTimeMillis()
         isPaused = false
-        pausedElapsedTime = 0
-        intervalPausedTime = 0
+        pauseStartTime = 0
+        intervalPauseStartTime = 0
         
         // Set initial remaining time immediately
         _totalRemainingTimeSeconds.value = totalDurationSeconds.toLong()
@@ -145,8 +146,11 @@ class TrainingSessionViewModel(
             while (true) {
                 delay(1000) // Update every second
                 
+                val currentSession = session ?: break
+                
                 if (!isPaused) {
-                    val elapsed = System.currentTimeMillis() - sessionStartTime
+                    val now = System.currentTimeMillis()
+                    val elapsed = (now - currentSession.sessionStartTime) - (currentSession.pausedSeconds * 1000)
                     val remaining = (totalDurationSeconds.toLong() * 1000) - elapsed
                     _totalRemainingTimeSeconds.value = maxOf(0, remaining / 1000)
                     
@@ -183,11 +187,11 @@ class TrainingSessionViewModel(
      * Update current and next intervals based on current index
      */
     private fun updateIntervals() {
-        val workoutPlan = currentWorkoutPlan ?: run {
-            Timber.w("updateIntervals called but no workout plan available")
+        val currentSession = session ?: run {
+            Timber.w("updateIntervals called but no session available")
             return
         }
-        val intervals = workoutPlan.intervals
+        val intervals = currentSession.workoutPlan.intervals
         
         if (currentIntervalIndex < intervals.size) {
             val workoutInterval = intervals[currentIntervalIndex]
@@ -214,8 +218,8 @@ class TrainingSessionViewModel(
      * Transition to next interval
      */
     private fun transitionToNextInterval() {
-        val workoutPlan = currentWorkoutPlan ?: return
-        val intervals = workoutPlan.intervals
+        val currentSession = session ?: return
+        val intervals = currentSession.workoutPlan.intervals
         
         if (currentIntervalIndex + 1 < intervals.size) {
             currentIntervalIndex++
@@ -226,7 +230,7 @@ class TrainingSessionViewModel(
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = workoutPlan,
+                    workoutPlan = currentSession.workoutPlan,
                     currentIntervalIndex = currentIntervalIndex,
                     isPaused = isPaused
                 )
@@ -241,15 +245,16 @@ class TrainingSessionViewModel(
      * Pause the session
      */
     fun pauseSession() {
+        val currentSession = session ?: return
         if (!isPaused) {
             isPaused = true
-            pausedElapsedTime = System.currentTimeMillis() - sessionStartTime
-            intervalPausedTime = System.currentTimeMillis() - intervalStartTime
+            pauseStartTime = System.currentTimeMillis()
+            intervalPauseStartTime = System.currentTimeMillis()
             
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = currentState.workoutPlan,
+                    workoutPlan = currentSession.workoutPlan,
                     currentIntervalIndex = currentState.currentIntervalIndex,
                     isPaused = true
                 )
@@ -261,16 +266,25 @@ class TrainingSessionViewModel(
      * Resume the session
      */
     fun resumeSession() {
+        val currentSession = session ?: return
         if (isPaused) {
+            val now = System.currentTimeMillis()
+            // Add the paused duration to the total paused time
+            val pauseDuration = (now - pauseStartTime) / 1000
+            currentSession.pausedSeconds += pauseDuration
+            
+            // Adjust interval start time to account for the pause
+            val intervalPauseDuration = now - intervalPauseStartTime
+            intervalStartTime += intervalPauseDuration
+            
             isPaused = false
-            // Adjust start times to account for paused duration
-            sessionStartTime = System.currentTimeMillis() - pausedElapsedTime
-            intervalStartTime = System.currentTimeMillis() - intervalPausedTime
+            pauseStartTime = 0
+            intervalPauseStartTime = 0
             
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = currentState.workoutPlan,
+                    workoutPlan = currentSession.workoutPlan,
                     currentIntervalIndex = currentState.currentIntervalIndex,
                     isPaused = false
                 )
@@ -287,10 +301,12 @@ class TrainingSessionViewModel(
             while (true) {
                 delay(1000) // Sample every 1 second
                 
+                val currentSession = session ?: break
+                
                 if (!isPaused && _sessionState.value is TrainingSessionState.Active) {
                     val currentInterval = _currentInterval.value
                     if (currentInterval != null) {
-                        val sessionElapsed = System.currentTimeMillis() - sessionStartTime
+                        val sessionElapsed = System.currentTimeMillis() - currentSession.sessionStartTime
                         val intervalElapsed = System.currentTimeMillis() - intervalStartTime
                         val intervalElapsedSeconds = (intervalElapsed / 1000).toInt()
                         
@@ -302,7 +318,7 @@ class TrainingSessionViewModel(
                             intervalElapsedSeconds = intervalElapsedSeconds
                         )
                         
-                        sessionDataPoints.add(dataPoint)
+                        currentSession.dataPoints.add(dataPoint)
                         Timber.v("Collected data point: cadence=${currentCadence}, resistance=${currentResistance}, interval=${currentIntervalIndex}")
                     }
                 }
@@ -318,6 +334,7 @@ class TrainingSessionViewModel(
         timerJob = null
         dataCollectionJob?.cancel()
         dataCollectionJob = null
+        session?.end()
         _sessionState.value = TrainingSessionState.Completed
     }
     
@@ -356,27 +373,11 @@ class TrainingSessionViewModel(
     }
     
     /**
-     * Get session summary data
-     */
-    fun getSessionSummary(): Pair<Int, Int>? {
-        val workoutPlan = currentWorkoutPlan ?: return null
-        val durationMinutes = (workoutPlan.totalDurationSeconds / 60).toInt()
-        val intervalsCompleted = currentIntervalIndex + 1
-        return Pair(durationMinutes, intervalsCompleted)
-    }
-    
-    /**
      * Get complete session performance data with aggregated statistics
      */
     fun getSessionPerformance(): SessionPerformance? {
-        val workoutPlan = currentWorkoutPlan ?: return null
-        val sessionEndTime = System.currentTimeMillis()
-        return sessionEvaluator.calculateSessionPerformance(
-            workoutPlan = workoutPlan,
-            sessionStartTime = sessionStartTime,
-            sessionEndTime = sessionEndTime,
-            dataPoints = sessionDataPoints
-        )
+        val currentSession = session ?: return null
+        return sessionEvaluator.calculateSessionPerformance(currentSession)
     }
     
     /**
@@ -398,7 +399,8 @@ class TrainingSessionViewModel(
         super.onCleared()
         timerJob?.cancel()
         dataCollectionJob?.cancel()
-        sessionDataPoints.clear()
+        session?.clearDataPoints()
+        session = null
     }
 }
 
