@@ -8,12 +8,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.digbata.pelopen.R
 import de.digbata.pelopen.training.TargetStatus
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
@@ -28,7 +26,6 @@ import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.data.TrainingSession
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.onEach
 import java.util.concurrent.TimeUnit
 
 /**

@@ -9,7 +9,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.digbata.pelopen.training.data.TrainingSession
 import de.digbata.pelopen.training.SessionEvaluator
-import de.digbata.pelopen.training.data.PlanDifficultyAssessment
 
 /**
  * Screen showing session completion summary

@@ -30,9 +30,7 @@ sealed class TrainingSessionState {
 /**
  * ViewModel for managing training session state and timer
  */
-class TrainingSessionViewModel(
-    private val sessionEvaluator: SessionEvaluator = SessionEvaluator()
-) : ViewModel() {
+class TrainingSessionViewModel() : ViewModel() {
     
     private val _sessionState = MutableStateFlow<TrainingSessionState>(TrainingSessionState.Idle)
     val sessionState: StateFlow<TrainingSessionState> = _sessionState.asStateFlow()
