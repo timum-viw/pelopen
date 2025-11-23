@@ -24,6 +24,7 @@ import de.digbata.pelopen.training.data.WorkoutInterval
 import androidx.activity.compose.BackHandler
 import de.digbata.pelopen.training.TrainingSessionState
 import de.digbata.pelopen.training.TrainingSessionViewModel
+import de.digbata.pelopen.training.data.WorkoutPlan
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
@@ -35,9 +36,14 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun TrainingSessionScreen(
     sensorInterface: SensorInterface,
+    workoutPlan: WorkoutPlan,
     viewModel: TrainingSessionViewModel,
     onEndSession: () -> Unit = {}
 ) {
+    // Initialize session when workout plan is provided
+    LaunchedEffect(workoutPlan) {
+        viewModel.startSession(workoutPlan)
+    }
     var cadence by remember { mutableStateOf(0f) }
     var resistance by remember { mutableStateOf(0f) }
     

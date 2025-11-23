@@ -9,11 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import de.digbata.pelopen.R
-import de.digbata.pelopen.training.TrainingSessionState
-import de.digbata.pelopen.training.TrainingSessionViewModel
+import de.digbata.pelopen.training.data.WorkoutPlan
+import de.digbata.pelopen.training.network.TrainingPlanRepository
 import com.spop.peloton.sensors.interfaces.SensorInterface
 
 /**
@@ -21,26 +19,15 @@ import com.spop.peloton.sensors.interfaces.SensorInterface
  */
 @Composable
 fun TrainingConfigScreen(
-    sensorInterface: SensorInterface, // Keep for future use
-    viewModel: TrainingSessionViewModel,
-    onStartSession: () -> Unit = {}
+    onStartSession: (WorkoutPlan) -> Unit = {}
 ) {
-    // sensorInterface kept for future use
     var selectedDurationMinutes by remember { mutableStateOf(30) }
     var selectedIntensity by remember { mutableStateOf(3) } // Low=3, Mid=6, High=8
     
-    val sessionState by viewModel.sessionState.collectAsState()
-    
-    // Handle state changes
-    LaunchedEffect(sessionState) {
-        val state = sessionState
-        when (state) {
-            is TrainingSessionState.Active -> {
-                onStartSession()
-            }
-            else -> {}
-        }
-    }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val repository = remember { TrainingPlanRepository() }
+    val scope = rememberCoroutineScope()
     
     Column(
         modifier = Modifier
@@ -55,20 +42,31 @@ fun TrainingConfigScreen(
             fontWeight = FontWeight.Bold
         )
         
-        when (sessionState) {
-            is TrainingSessionState.Loading -> {
+        when {
+            isLoading -> {
                 CircularProgressIndicator()
                 Text("Loading workout plan…")
             }
-            is TrainingSessionState.Error -> {
-                val errorState = sessionState as TrainingSessionState.Error
+            errorMessage != null -> {
                 Text(
-                    text = errorState.message,
+                    text = errorMessage ?: "Unknown error",
                     color = MaterialTheme.colorScheme.error
                 )
                 Button(onClick = {
                     val durationSeconds = selectedDurationMinutes * 60
-                    viewModel.startSession(durationSeconds, selectedIntensity)
+                    scope.launch {
+                        isLoading = true
+                        errorMessage = null
+                        repository.fetchWorkoutPlan(durationSeconds, selectedIntensity)
+                            .onSuccess { workoutPlan ->
+                                isLoading = false
+                                onStartSession(workoutPlan)
+                            }
+                            .onFailure { error ->
+                                isLoading = false
+                                errorMessage = error.message ?: "Failed to load workout plan"
+                            }
+                    }
                 }) {
                     Text("Retry")
                 }
@@ -175,10 +173,22 @@ fun TrainingConfigScreen(
                 Button(
                     onClick = {
                         val durationSeconds = selectedDurationMinutes * 60
-                        viewModel.startSession(durationSeconds, selectedIntensity)
+                        scope.launch {
+                            isLoading = true
+                            errorMessage = null
+                            repository.fetchWorkoutPlan(durationSeconds, selectedIntensity)
+                                .onSuccess { workoutPlan ->
+                                    isLoading = false
+                                    onStartSession(workoutPlan)
+                                }
+                                .onFailure { error ->
+                                    isLoading = false
+                                    errorMessage = error.message ?: "Failed to load workout plan"
+                                }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = sessionState !is TrainingSessionState.Loading
+                    enabled = !isLoading
                 ) {
                     Text("Start Training", style = MaterialTheme.typography.titleLarge)
                 }

@@ -3,7 +3,6 @@ package de.digbata.pelopen.training
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.digbata.pelopen.training.data.*
-import de.digbata.pelopen.training.network.TrainingPlanRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +31,6 @@ sealed class TrainingSessionState {
  * ViewModel for managing training session state and timer
  */
 class TrainingSessionViewModel(
-    private val repository: TrainingPlanRepository = TrainingPlanRepository(),
     private val sessionEvaluator: SessionEvaluator = SessionEvaluator()
 ) : ViewModel() {
     
@@ -80,45 +78,35 @@ class TrainingSessionViewModel(
     private var currentResistance: Float = 0f
     
     /**
-     * Start a new training session
+     * Start a new training session with a workout plan
      */
-    fun startSession(durationSeconds: Int, intensity: Int) {
+    fun startSession(workoutPlan: WorkoutPlan) {
         viewModelScope.launch {
-            _sessionState.value = TrainingSessionState.Loading
-            Timber.d("Starting training session: duration=$durationSeconds, intensity=$intensity")
+            Timber.d("Starting training session: ${workoutPlan.intervals.size} intervals, total duration=${workoutPlan.totalDurationSeconds}s")
             
-            repository.fetchWorkoutPlan(durationSeconds, intensity)
-                .onSuccess { workoutPlan ->
-                    Timber.d("Workout plan loaded: ${workoutPlan.intervals.size} intervals, total duration=${workoutPlan.totalDurationSeconds}s")
-                    
-                    // Create new session
-                    val sessionStartTime = System.currentTimeMillis()
-                    session = TrainingSession(
-                        workoutPlan = workoutPlan,
-                        sessionStartTime = sessionStartTime
-                    )
-                    currentIntervalIndex = 0
-                    
-                    // Update current and next intervals BEFORE starting timer
-                    updateIntervals()
-                    Timber.d("Updated intervals: current=${_currentInterval.value?.name}, next=${_nextInterval.value?.name}")
-                    
-                    _sessionState.value = TrainingSessionState.Active(
-                        workoutPlan = workoutPlan,
-                        currentIntervalIndex = 0,
-                        isPaused = false
-                    )
-                    
-                    // Start timer AFTER intervals are set
-                    startTimer(workoutPlan.totalDurationSeconds)
-                    // Start data collection
-                    startDataCollection()
-                    Timber.d("Timer started for ${workoutPlan.totalDurationSeconds}s")
-                }
-                .onFailure { error ->
-                    Timber.e(error, "Failed to load workout plan")
-                    _sessionState.value = TrainingSessionState.Error(error.message ?: "Failed to load workout plan")
-                }
+            // Create new session
+            val sessionStartTime = System.currentTimeMillis()
+            session = TrainingSession(
+                workoutPlan = workoutPlan,
+                sessionStartTime = sessionStartTime
+            )
+            currentIntervalIndex = 0
+            
+            // Update current and next intervals BEFORE starting timer
+            updateIntervals()
+            Timber.d("Updated intervals: current=${_currentInterval.value?.name}, next=${_nextInterval.value?.name}")
+            
+            _sessionState.value = TrainingSessionState.Active(
+                workoutPlan = workoutPlan,
+                currentIntervalIndex = 0,
+                isPaused = false
+            )
+            
+            // Start timer AFTER intervals are set
+            startTimer(workoutPlan.totalDurationSeconds)
+            // Start data collection
+            startDataCollection()
+            Timber.d("Timer started for ${workoutPlan.totalDurationSeconds}s")
         }
     }
     

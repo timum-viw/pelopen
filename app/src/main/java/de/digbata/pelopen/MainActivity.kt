@@ -24,6 +24,7 @@ import de.digbata.pelopen.navigation.AppTab
 import de.digbata.pelopen.navigation.Screen
 import de.digbata.pelopen.training.TrainingSessionViewModel
 import de.digbata.pelopen.training.TrainingSessionState
+import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.ui.SessionSummaryScreen
 import de.digbata.pelopen.training.ui.TrainingConfigScreen
 import de.digbata.pelopen.training.ui.TrainingSessionScreen
@@ -253,6 +254,8 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
             AppTab.TRAINING -> {
                 // Share ViewModel across all training screens
                 val trainingViewModel: TrainingSessionViewModel = viewModel(key = "training_session")
+                // Store selected workout plan to pass to TrainingSessionScreen
+                var selectedWorkoutPlan by remember { mutableStateOf<WorkoutPlan?>(null) }
                 
                 NavHost(
                     navController = navController,
@@ -260,9 +263,8 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                 ) {
                     composable(Screen.TrainingConfig.route) {
                         TrainingConfigScreen(
-                            sensorInterface = sensorInterface,
-                            viewModel = trainingViewModel,
-                            onStartSession = {
+                            onStartSession = { workoutPlan ->
+                                selectedWorkoutPlan = workoutPlan
                                 navController.navigate(Screen.TrainingSession.route)
                             }
                         )
@@ -300,13 +302,21 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                             )
                         }
                         
-                        TrainingSessionScreen(
-                            sensorInterface = sensorInterface,
-                            viewModel = trainingViewModel,
-                            onEndSession = {
-                                navController.navigate(Screen.SessionSummary.route)
+                        selectedWorkoutPlan?.let { workoutPlan ->
+                            TrainingSessionScreen(
+                                sensorInterface = sensorInterface,
+                                workoutPlan = workoutPlan,
+                                viewModel = trainingViewModel,
+                                onEndSession = {
+                                    navController.navigate(Screen.SessionSummary.route)
+                                }
+                            )
+                        } ?: run {
+                            // If no workout plan, navigate back to config
+                            LaunchedEffect(Unit) {
+                                navController.popBackStack()
                             }
-                        )
+                        }
                     }
                     
                     composable(Screen.SessionSummary.route) {
