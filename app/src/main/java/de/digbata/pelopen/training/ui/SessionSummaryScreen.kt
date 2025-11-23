@@ -7,8 +7,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import de.digbata.pelopen.training.TrainingSessionViewModel
+import de.digbata.pelopen.training.data.TrainingSession
+import de.digbata.pelopen.training.SessionEvaluator
 import de.digbata.pelopen.training.data.PlanDifficultyAssessment
 
 /**
@@ -16,11 +16,14 @@ import de.digbata.pelopen.training.data.PlanDifficultyAssessment
  */
 @Composable
 fun SessionSummaryScreen(
-    viewModel: TrainingSessionViewModel,
+    completedSession: TrainingSession,
     onStartNewSession: () -> Unit = {},
     onBackToSensors: () -> Unit = {}
 ) {
-    val performance = remember { viewModel.getSessionPerformance() }
+    val sessionEvaluator = remember { SessionEvaluator() }
+    val performance = remember(completedSession) {
+        sessionEvaluator.calculateSessionPerformance(completedSession)
+    }
     
     Column(
         modifier = Modifier

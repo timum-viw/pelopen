@@ -377,6 +377,13 @@ class TrainingSessionViewModel(
     }
     
     /**
+     * Get the current training session (if available)
+     */
+    fun getSession(): TrainingSession? {
+        return session
+    }
+    
+    /**
      * Dismiss interval change notification
      */
     fun dismissIntervalNotification() {

@@ -25,6 +25,7 @@ import androidx.activity.compose.BackHandler
 import de.digbata.pelopen.training.TrainingSessionState
 import de.digbata.pelopen.training.TrainingSessionViewModel
 import de.digbata.pelopen.training.data.WorkoutPlan
+import de.digbata.pelopen.training.data.TrainingSession
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
@@ -38,7 +39,7 @@ fun TrainingSessionScreen(
     sensorInterface: SensorInterface,
     workoutPlan: WorkoutPlan,
     viewModel: TrainingSessionViewModel,
-    onEndSession: () -> Unit = {}
+    onEndSession: (TrainingSession) -> Unit = {}
 ) {
     // Initialize session when workout plan is provided
     LaunchedEffect(workoutPlan) {
@@ -97,7 +98,9 @@ fun TrainingSessionScreen(
     // Handle session completion
     LaunchedEffect(sessionState) {
         if (sessionState is TrainingSessionState.Completed) {
-            onEndSession()
+            viewModel.getSession()?.let { session ->
+                onEndSession(session)
+            }
         }
     }
     
@@ -416,8 +419,10 @@ fun TrainingSessionScreen(
                 text = { Text("Your progress will be lost.") },
                 confirmButton = {
                     TextButton(onClick = {
+                        viewModel.getSession()?.let { session ->
+                            onEndSession(session)
+                        }
                         viewModel.endSession()
-                        onEndSession()
                         showExitDialog = false
                     }) {
                         Text("End")

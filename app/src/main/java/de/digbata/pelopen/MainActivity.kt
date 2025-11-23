@@ -24,6 +24,7 @@ import de.digbata.pelopen.navigation.Screen
 import de.digbata.pelopen.training.TrainingSessionViewModel
 import de.digbata.pelopen.training.TrainingSessionState
 import de.digbata.pelopen.training.data.WorkoutPlan
+import de.digbata.pelopen.training.data.TrainingSession
 import de.digbata.pelopen.training.ui.SessionSummaryScreen
 import de.digbata.pelopen.training.ui.TrainingConfigScreen
 import de.digbata.pelopen.training.ui.TrainingSessionScreen
@@ -144,6 +145,7 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                 val trainingViewModel: TrainingSessionViewModel = viewModel(key = "training_session")
                 // Store selected workout plan to pass to TrainingSessionScreen
                 var selectedWorkoutPlan by remember { mutableStateOf<WorkoutPlan?>(null) }
+                var completedSession by remember { mutableStateOf<TrainingSession?>(null) }
                 
                 NavHost(
                     navController = navController,
@@ -195,7 +197,8 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                                 sensorInterface = sensorInterface,
                                 workoutPlan = workoutPlan,
                                 viewModel = trainingViewModel,
-                                onEndSession = {
+                                onEndSession = { session: TrainingSession ->
+                                    completedSession = session
                                     navController.navigate(Screen.SessionSummary.route)
                                 }
                             )
@@ -208,8 +211,9 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                     }
                     
                     composable(Screen.SessionSummary.route) {
-                        SessionSummaryScreen(
-                            viewModel = trainingViewModel,
+                        completedSession?.let { session ->
+                            SessionSummaryScreen(
+                                completedSession = session,
                             onStartNewSession = {
                                 navController.navigate(Screen.TrainingConfig.route) {
                                     popUpTo(Screen.TrainingConfig.route) { inclusive = true }
@@ -218,7 +222,13 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                             onBackToSensors = {
                                 selectedTab = AppTab.SENSORS
                             }
-                        )
+                            )
+                        } ?: run {
+                            // If no completed session, navigate back to config
+                            LaunchedEffect(Unit) {
+                                navController.popBackStack()
+                            }
+                        }
                     }
                 }
             }
