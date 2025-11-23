@@ -162,7 +162,7 @@ class TrainingSessionViewModel(
                     
                     // Check if session is complete
                     if (remaining <= 0) {
-                        endSession()
+                        endSession(completed = true)
                         break
                     }
                 }
@@ -225,7 +225,7 @@ class TrainingSessionViewModel(
             }
         } else {
             // No more intervals, session complete
-            endSession()
+            endSession(completed = true)
         }
     }
     
@@ -316,13 +316,14 @@ class TrainingSessionViewModel(
     
     /**
      * End the session
+     * @param completed true if the session completed naturally, false if stopped early
      */
-    fun endSession() {
+    fun endSession(completed: Boolean = false) {
         timerJob?.cancel()
         timerJob = null
         dataCollectionJob?.cancel()
         dataCollectionJob = null
-        session?.end()
+        session?.end(completed)
         _sessionState.value = TrainingSessionState.Completed
     }
     
@@ -358,22 +359,6 @@ class TrainingSessionViewModel(
             actual > targetMax -> TargetStatus.AboveMax
             else -> TargetStatus.WithinRange
         }
-    }
-    
-    /**
-     * Get complete session performance data with aggregated statistics
-     */
-    fun getSessionPerformance(): SessionPerformance? {
-        val currentSession = session ?: return null
-        return sessionEvaluator.calculateSessionPerformance(currentSession)
-    }
-    
-    /**
-     * Get session evaluation with recommendations
-     */
-    fun getSessionEvaluation(): SessionEvaluation? {
-        val performance = getSessionPerformance() ?: return null
-        return sessionEvaluator.evaluateSession(performance)
     }
     
     /**

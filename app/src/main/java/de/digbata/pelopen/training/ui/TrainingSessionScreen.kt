@@ -38,9 +38,10 @@ import java.util.concurrent.TimeUnit
 fun TrainingSessionScreen(
     sensorInterface: SensorInterface,
     workoutPlan: WorkoutPlan,
-    viewModel: TrainingSessionViewModel,
     onEndSession: (TrainingSession) -> Unit = {}
 ) {
+    val viewModel: TrainingSessionViewModel = viewModel()
+    
     // Initialize session when workout plan is provided
     LaunchedEffect(workoutPlan) {
         viewModel.startSession(workoutPlan)
@@ -422,7 +423,7 @@ fun TrainingSessionScreen(
                         viewModel.getSession()?.let { session ->
                             onEndSession(session)
                         }
-                        viewModel.endSession()
+                        viewModel.endSession(completed = false)
                         showExitDialog = false
                     }) {
                         Text("End")

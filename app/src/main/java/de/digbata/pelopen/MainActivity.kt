@@ -14,15 +14,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.activity.compose.BackHandler
 import de.digbata.pelopen.navigation.AppTab
 import de.digbata.pelopen.navigation.Screen
-import de.digbata.pelopen.training.TrainingSessionViewModel
-import de.digbata.pelopen.training.TrainingSessionState
 import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.data.TrainingSession
 import de.digbata.pelopen.training.ui.SessionSummaryScreen
@@ -141,8 +138,6 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                 SensorDisplayScreen(sensorInterface = sensorInterface)
             }
             AppTab.TRAINING -> {
-                // Share ViewModel across all training screens
-                val trainingViewModel: TrainingSessionViewModel = viewModel(key = "training_session")
                 // Store selected workout plan to pass to TrainingSessionScreen
                 var selectedWorkoutPlan by remember { mutableStateOf<WorkoutPlan?>(null) }
                 var completedSession by remember { mutableStateOf<TrainingSession?>(null) }
@@ -161,42 +156,10 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                     }
                     
                     composable(Screen.TrainingSession.route) {
-                        var showExitDialog by remember { mutableStateOf(false) }
-                        val sessionState by trainingViewModel.sessionState.collectAsState()
-                        val isSessionActive = sessionState is TrainingSessionState.Active
-                        
-                        // Handle back navigation
-                        BackHandler(enabled = isSessionActive) {
-                            showExitDialog = true
-                        }
-                        
-                        if (showExitDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showExitDialog = false },
-                                title = { Text("End Training Session?") },
-                                text = { Text("Your progress will be lost.") },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        trainingViewModel.endSession()
-                                        navController.popBackStack()
-                                        showExitDialog = false
-                                    }) {
-                                        Text("End")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showExitDialog = false }) {
-                                        Text("Cancel")
-                                    }
-                                }
-                            )
-                        }
-                        
                         selectedWorkoutPlan?.let { workoutPlan ->
                             TrainingSessionScreen(
                                 sensorInterface = sensorInterface,
                                 workoutPlan = workoutPlan,
-                                viewModel = trainingViewModel,
                                 onEndSession = { session: TrainingSession ->
                                     completedSession = session
                                     navController.navigate(Screen.SessionSummary.route)
