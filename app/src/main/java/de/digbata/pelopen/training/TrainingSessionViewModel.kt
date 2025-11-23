@@ -63,9 +63,7 @@ class TrainingSessionViewModel() : ViewModel() {
     private var session: TrainingSession? = null
     
     // Timer state
-    private var intervalStartTime: Long = 0
     private var pauseStartTime: Long = 0 // When current pause started
-    private var intervalPauseStartTime: Long = 0 // When current interval pause started
     private var isPaused: Boolean = false
     private var timerJob: Job? = null
     private var dataCollectionJob: Job? = null
@@ -109,14 +107,33 @@ class TrainingSessionViewModel() : ViewModel() {
     }
     
     /**
+     * Calculate total elapsed milliseconds for the current session
+     * Accounts for paused time by subtracting it from wall-clock elapsed time
+     */
+    private fun calculateTotalElapsedMillis(session: TrainingSession): Long {
+        val now = System.currentTimeMillis()
+        val totalElapsed = (now - session.sessionStartTime) - (session.pausedSeconds * 1000)
+        return maxOf(0L, totalElapsed)
+    }
+    
+    /**
+     * Calculate elapsed time in the current interval based on total elapsed time
+     */
+    private fun calculateIntervalElapsed(totalElapsedMillis: Long, currentIntervalIndex: Int, intervals: List<WorkoutInterval>): Int {
+        // Sum up durations of all previous intervals in milliseconds
+        val previousIntervalsDurationMillis = intervals.take(currentIntervalIndex).sumOf { it.durationSeconds.toLong() * 1000 }
+        // Elapsed time in current interval = total elapsed - previous intervals duration
+        val intervalElapsedMillis = maxOf(0L, totalElapsedMillis - previousIntervalsDurationMillis)
+        return (intervalElapsedMillis / 1000).toInt()
+    }
+    
+    /**
      * Start the timer
      */
     private fun startTimer(totalDurationSeconds: Int) {
         val currentSession = session ?: return
-        intervalStartTime = System.currentTimeMillis()
         isPaused = false
         pauseStartTime = 0
-        intervalPauseStartTime = 0
         
         // Set initial remaining time immediately
         _totalRemainingTimeSeconds.value = totalDurationSeconds.toLong()
@@ -135,20 +152,23 @@ class TrainingSessionViewModel() : ViewModel() {
                 val currentSession = session ?: break
                 
                 if (!isPaused) {
-                    val now = System.currentTimeMillis()
-                    val elapsed = (now - currentSession.sessionStartTime) - (currentSession.pausedSeconds * 1000)
-                    val remaining = (totalDurationSeconds.toLong() * 1000) - elapsed
+                    val totalElapsedMillis = calculateTotalElapsedMillis(currentSession)
+                    val remaining = (totalDurationSeconds.toLong() * 1000) - totalElapsedMillis
                     _totalRemainingTimeSeconds.value = maxOf(0, remaining / 1000)
                     
                     // Calculate session progress for progress bar
-                    val progress = (elapsed.toFloat() / (totalDurationSeconds.toLong() * 1000)).coerceIn(0f, 1f)
+                    val progress = (totalElapsedMillis.toFloat() / (totalDurationSeconds.toLong() * 1000)).coerceIn(0f, 1f)
                     _sessionProgress.value = progress
                     
-                    // Calculate current interval remaining time
+                    // Calculate current interval remaining time from total elapsed
                     _currentInterval.value?.let { workoutInterval ->
-                        val intervalElapsed = System.currentTimeMillis() - intervalStartTime
-                        val intervalRemaining = (workoutInterval.durationSeconds * 1000) - intervalElapsed
-                        _currentIntervalRemainingSeconds.value = maxOf(0, intervalRemaining / 1000)
+                        val intervalElapsedSeconds = calculateIntervalElapsed(
+                            totalElapsedMillis,
+                            currentIntervalIndex,
+                            currentSession.workoutPlan.intervals
+                        )
+                        val intervalRemaining = workoutInterval.durationSeconds - intervalElapsedSeconds
+                        _currentIntervalRemainingSeconds.value = maxOf(0, intervalRemaining.toLong())
                         
                         // Trigger interval transition immediately when time reaches 0
                         if (intervalRemaining <= 0) {
@@ -209,7 +229,6 @@ class TrainingSessionViewModel() : ViewModel() {
         
         if (currentIntervalIndex + 1 < intervals.size) {
             currentIntervalIndex++
-            intervalStartTime = System.currentTimeMillis()
             updateIntervals()
             
             // Update state
@@ -235,7 +254,6 @@ class TrainingSessionViewModel() : ViewModel() {
         if (!isPaused) {
             isPaused = true
             pauseStartTime = System.currentTimeMillis()
-            intervalPauseStartTime = System.currentTimeMillis()
             
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
@@ -259,13 +277,8 @@ class TrainingSessionViewModel() : ViewModel() {
             val pauseDuration = (now - pauseStartTime) / 1000
             currentSession.pausedSeconds += pauseDuration
             
-            // Adjust interval start time to account for the pause
-            val intervalPauseDuration = now - intervalPauseStartTime
-            intervalStartTime += intervalPauseDuration
-            
             isPaused = false
             pauseStartTime = 0
-            intervalPauseStartTime = 0
             
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
@@ -292,12 +305,15 @@ class TrainingSessionViewModel() : ViewModel() {
                 if (!isPaused && _sessionState.value is TrainingSessionState.Active) {
                     val currentInterval = _currentInterval.value
                     if (currentInterval != null) {
-                        val sessionElapsed = System.currentTimeMillis() - currentSession.sessionStartTime
-                        val intervalElapsed = System.currentTimeMillis() - intervalStartTime
-                        val intervalElapsedSeconds = (intervalElapsed / 1000).toInt()
+                        val totalElapsedMillis = calculateTotalElapsedMillis(currentSession)
+                        val intervalElapsedSeconds = calculateIntervalElapsed(
+                            totalElapsedMillis,
+                            currentIntervalIndex,
+                            currentSession.workoutPlan.intervals
+                        )
                         
                         val dataPoint = SessionDataPoint(
-                            timestamp = sessionElapsed,
+                            timestamp = totalElapsedMillis,
                             cadence = currentCadence,
                             resistance = currentResistance,
                             intervalIndex = currentIntervalIndex,
