@@ -57,6 +57,6 @@ RUN yes | ${ANDROID_HOME}/cmdline-tools/bin/sdkmanager --sdk_root=${ANDROID_HOME
 # Set Java home
 ENV JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
 
-WORKDIR /workspaces/grupetto
+WORKDIR /workspaces/pelopen
 
 

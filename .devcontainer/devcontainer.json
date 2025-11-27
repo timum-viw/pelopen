@@ -1,5 +1,5 @@
 {
-	"name": "Grupetto Android Dev",
+	"name": "Pelopen Android Dev",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": ".."
@@ -22,8 +22,8 @@
 	},
 	
 	// Mount the workspace
-	"workspaceFolder": "/workspaces/grupetto",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/grupetto,type=bind",
+	"workspaceFolder": "/workspaces/pelopen",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/pelopen,type=bind",
 	
 	// VS Code customizations
 	"customizations": {
