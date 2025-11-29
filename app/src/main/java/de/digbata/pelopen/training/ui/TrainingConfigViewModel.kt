@@ -3,6 +3,8 @@ package de.digbata.pelopen.training.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.digbata.pelopen.training.data.TrainingSession
+import de.digbata.pelopen.training.data.TrainingSessionRepository
 import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.data.WorkoutPlanRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,15 +17,28 @@ import kotlinx.coroutines.launch
 data class TrainingConfigUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val fetchedPlan: WorkoutPlan? = null
+    val fetchedPlan: WorkoutPlan? = null,
+    val savedSessions: List<TrainingSession> = emptyList()
 )
 
 class TrainingConfigViewModel(application: Application) : AndroidViewModel(application) {
 
     private val workoutPlanRepository = WorkoutPlanRepository(application.applicationContext)
+    private val trainingSessionRepository = TrainingSessionRepository(application.applicationContext)
 
     private val _uiState = MutableStateFlow(TrainingConfigUiState())
     val uiState: StateFlow<TrainingConfigUiState> = _uiState.asStateFlow()
+
+    init {
+        loadSavedSessions()
+    }
+
+    private fun loadSavedSessions() {
+        viewModelScope.launch {
+            val sessions = trainingSessionRepository.loadAllSessions()
+            _uiState.update { it.copy(savedSessions = sessions) }
+        }
+    }
 
     fun fetchWorkoutPlan(durationSeconds: Int, intensity: Int) {
         viewModelScope.launch {
