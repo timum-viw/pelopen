@@ -8,27 +8,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import de.digbata.pelopen.training.data.WorkoutPlan
-import de.digbata.pelopen.training.network.TrainingPlanRepository
-import com.spop.peloton.sensors.interfaces.SensorInterface
 
 /**
  * Screen for configuring training session (duration and intensity selection)
  */
 @Composable
 fun TrainingConfigScreen(
-    onStartSession: (WorkoutPlan) -> Unit = {}
+    onStartSession: (WorkoutPlan) -> Unit = {},
+    viewModel: TrainingConfigViewModel = viewModel()
 ) {
     var selectedDurationMinutes by remember { mutableStateOf(30) }
     var selectedIntensity by remember { mutableStateOf(3) } // Low=3, Mid=6, High=8
-    
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val repository = remember { TrainingPlanRepository() }
-    val scope = rememberCoroutineScope()
-    
+
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Effect to handle navigation when a plan is successfully fetched
+    LaunchedEffect(uiState.fetchedPlan) {
+        uiState.fetchedPlan?.let {
+            onStartSession(it)
+            viewModel.onPlanHandled() // Reset the event
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -41,32 +44,20 @@ fun TrainingConfigScreen(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )
-        
+
         when {
-            isLoading -> {
+            uiState.isLoading -> {
                 CircularProgressIndicator()
                 Text("Loading workout plan…")
             }
-            errorMessage != null -> {
+            uiState.errorMessage != null -> {
                 Text(
-                    text = errorMessage ?: "Unknown error",
+                    text = uiState.errorMessage ?: "Unknown error",
                     color = MaterialTheme.colorScheme.error
                 )
                 Button(onClick = {
                     val durationSeconds = selectedDurationMinutes * 60
-                    scope.launch {
-                        isLoading = true
-                        errorMessage = null
-                        repository.fetchWorkoutPlan(durationSeconds, selectedIntensity)
-                            .onSuccess { workoutPlan ->
-                                isLoading = false
-                                onStartSession(workoutPlan)
-                            }
-                            .onFailure { error ->
-                                isLoading = false
-                                errorMessage = error.message ?: "Failed to load workout plan"
-                            }
-                    }
+                    viewModel.fetchWorkoutPlan(durationSeconds, selectedIntensity)
                 }) {
                     Text("Retry")
                 }
@@ -85,7 +76,7 @@ fun TrainingConfigScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        
+
                         // Quick selection buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -110,9 +101,9 @@ fun TrainingConfigScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
-                        
+
                         // Slider
                         Text("${selectedDurationMinutes} minutes")
                         Slider(
@@ -124,7 +115,7 @@ fun TrainingConfigScreen(
                         )
                     }
                 }
-                
+
                 // Intensity selection
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -138,7 +129,7 @@ fun TrainingConfigScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        
+
                         // Discrete intensity options
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -168,27 +159,15 @@ fun TrainingConfigScreen(
                         }
                     }
                 }
-                
+
                 // Start button
                 Button(
                     onClick = {
                         val durationSeconds = selectedDurationMinutes * 60
-                        scope.launch {
-                            isLoading = true
-                            errorMessage = null
-                            repository.fetchWorkoutPlan(durationSeconds, selectedIntensity)
-                                .onSuccess { workoutPlan ->
-                                    isLoading = false
-                                    onStartSession(workoutPlan)
-                                }
-                                .onFailure { error ->
-                                    isLoading = false
-                                    errorMessage = error.message ?: "Failed to load workout plan"
-                                }
-                        }
+                        viewModel.fetchWorkoutPlan(durationSeconds, selectedIntensity)
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading
+                    enabled = !uiState.isLoading
                 ) {
                     Text("Start Training", style = MaterialTheme.typography.titleLarge)
                 }
@@ -211,7 +190,7 @@ private fun QuickDurationButton(
         60 -> "60 min"
         else -> "$minutes min"
     }
-    
+
     FilterChip(
         selected = selected,
         onClick = onClick,
@@ -237,4 +216,3 @@ private fun IntensityButton(
         modifier = modifier
     )
 }
-
