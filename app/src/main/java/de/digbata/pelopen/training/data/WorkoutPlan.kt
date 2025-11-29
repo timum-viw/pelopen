@@ -1,8 +1,11 @@
 package de.digbata.pelopen.training.data
 
+import kotlinx.serialization.Serializable
+
 /**
  * Complete workout plan received from the service
  */
+@Serializable
 data class WorkoutPlan(
     val workoutId: String,
     val name: String? = null,
@@ -12,4 +15,3 @@ data class WorkoutPlan(
     val intervals: List<WorkoutInterval>,
     val metadata: WorkoutMetadata
 )
-
