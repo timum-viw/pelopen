@@ -1,6 +1,7 @@
 package de.digbata.pelopen.training
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.digbata.pelopen.training.data.*
 import kotlinx.coroutines.Job
@@ -30,7 +31,9 @@ sealed class TrainingSessionState {
 /**
  * ViewModel for managing training session state and timer
  */
-class TrainingSessionViewModel() : ViewModel() {
+class TrainingSessionViewModel(application: Application) : AndroidViewModel(application) {
+    
+    private val sessionRepository = TrainingSessionRepository(application.applicationContext)
     
     private val _sessionState = MutableStateFlow<TrainingSessionState>(TrainingSessionState.Idle)
     val sessionState: StateFlow<TrainingSessionState> = _sessionState.asStateFlow()
@@ -337,7 +340,10 @@ class TrainingSessionViewModel() : ViewModel() {
         timerJob = null
         dataCollectionJob?.cancel()
         dataCollectionJob = null
-        session?.end(completed)
+        session?.let {
+            it.end(completed)
+            sessionRepository.saveSession(it)
+        }
         _sessionState.value = TrainingSessionState.Completed
     }
     
@@ -397,4 +403,3 @@ class TrainingSessionViewModel() : ViewModel() {
         session = null
     }
 }
-
