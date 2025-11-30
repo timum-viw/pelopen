@@ -4,7 +4,6 @@ package de.digbata.pelopen.navigation
  * Type-safe navigation routes
  */
 sealed class Screen(val route: String) {
-    object SensorDisplay : Screen("sensor_display")
     object TrainingConfig : Screen("training_config")
     object TrainingSession : Screen("training_session")
     object SessionSummary : Screen("session_summary")

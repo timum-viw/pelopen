@@ -21,8 +21,7 @@ import java.util.*
 @Composable
 fun SessionSummaryScreen(
     completedSession: TrainingSession,
-    onStartNewSession: () -> Unit = {},
-    onBackToSensors: () -> Unit = {}
+    onStartNewSession: () -> Unit = {}
 ) {
     val sessionEvaluator = remember { SessionEvaluator() }
     val performance = remember(completedSession) {
@@ -106,13 +105,6 @@ fun SessionSummaryScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Start New Session")
-            }
-            
-            OutlinedButton(
-                onClick = onBackToSensors,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Back to Sensors")
             }
         }
     }

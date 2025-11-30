@@ -3,33 +3,26 @@ package de.digbata.pelopen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.activity.compose.BackHandler
-import de.digbata.pelopen.navigation.AppTab
-import de.digbata.pelopen.navigation.Screen
-import de.digbata.pelopen.training.data.WorkoutPlan
-import de.digbata.pelopen.training.data.TrainingSession
-import de.digbata.pelopen.training.ui.SessionSummaryScreen
-import de.digbata.pelopen.training.ui.TrainingConfigScreen
-import de.digbata.pelopen.training.ui.TrainingSessionScreen
-import de.digbata.pelopen.sensors.ui.SensorDisplayScreen
 import com.spop.peloton.sensors.interfaces.DummySensorInterface
 import com.spop.peloton.sensors.interfaces.PelotonBikePlusSensorInterface
 import com.spop.peloton.sensors.interfaces.PelotonBikeSensorInterfaceV1New
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import com.spop.peloton.sensors.util.IsBikePlus
 import com.spop.peloton.sensors.util.IsRunningOnPeloton
+import de.digbata.pelopen.navigation.TrainingNav
+import de.digbata.pelopen.navigation.AppTab
+import de.digbata.pelopen.sensors.ui.SensorDisplayScreen
 
 class MainActivity : ComponentActivity() {
     private var sensorInterface: SensorInterface? = null
@@ -43,10 +36,17 @@ class MainActivity : ComponentActivity() {
                 PelotonBikePlusSensorInterface(this).also { sensor ->
                     lifecycle.addObserver(object : DefaultLifecycleObserver {
                         override fun onPause(owner: LifecycleOwner) {
-                            try { sensor.stop() } catch (e: Exception) {}
+                            try {
+                                sensor.stop()
+                            } catch (e: Exception) {
+                            }
                         }
+
                         override fun onDestroy(owner: LifecycleOwner) {
-                            try { sensor.stop() } catch (e: Exception) {}
+                            try {
+                                sensor.stop()
+                            } catch (e: Exception) {
+                            }
                             lifecycle.removeObserver(this)
                         }
                     })
@@ -55,10 +55,17 @@ class MainActivity : ComponentActivity() {
                 PelotonBikeSensorInterfaceV1New(this).also { sensor ->
                     lifecycle.addObserver(object : DefaultLifecycleObserver {
                         override fun onPause(owner: LifecycleOwner) {
-                            try { sensor.stop() } catch (e: Exception) {}
+                            try {
+                                sensor.stop()
+                            } catch (e: Exception) {
+                            }
                         }
+
                         override fun onDestroy(owner: LifecycleOwner) {
-                            try { sensor.stop() } catch (e: Exception) {}
+                            try {
+                                sensor.stop()
+                            } catch (e: Exception) {
+                            }
                             lifecycle.removeObserver(this)
                         }
                     })
@@ -93,7 +100,7 @@ class MainActivity : ComponentActivity() {
         sensorInterface = null
         super.onDestroy()
     }
-    
+
     private fun stopSensorInterface() {
         sensorInterface?.let {
             if (it !is DummySensorInterface) {
@@ -112,9 +119,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainActivityContent(sensorInterface: SensorInterface) {
-    val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf(AppTab.SENSORS) }
-    
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Tab navigation
         TabRow(selectedTabIndex = selectedTab.ordinal) {
@@ -129,69 +135,16 @@ fun MainActivityContent(sensorInterface: SensorInterface) {
                 text = { Text("Training") }
             )
         }
-        
+
         // Show appropriate content based on selected tab
         when (selectedTab) {
             AppTab.SENSORS -> {
                 SensorDisplayScreen(sensorInterface = sensorInterface)
             }
             AppTab.TRAINING -> {
-                // Store selected workout plan to pass to TrainingSessionScreen
-                var selectedWorkoutPlan by remember { mutableStateOf<WorkoutPlan?>(null) }
-                var completedSession by remember { mutableStateOf<TrainingSession?>(null) }
-                
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.TrainingConfig.route
-                ) {
-                    composable(Screen.TrainingConfig.route) {
-                        TrainingConfigScreen(
-                            onStartSession = { workoutPlan ->
-                                selectedWorkoutPlan = workoutPlan
-                                navController.navigate(Screen.TrainingSession.route)
-                            }
-                        )
-                    }
-                    
-                    composable(Screen.TrainingSession.route) {
-                        selectedWorkoutPlan?.let { workoutPlan ->
-                            TrainingSessionScreen(
-                                sensorInterface = sensorInterface,
-                                workoutPlan = workoutPlan,
-                                onEndSession = { session: TrainingSession ->
-                                    completedSession = session
-                                    navController.navigate(Screen.SessionSummary.route)
-                                }
-                            )
-                        } ?: run {
-                            // If no workout plan, navigate back to config
-                            LaunchedEffect(Unit) {
-                                navController.popBackStack()
-                            }
-                        }
-                    }
-                    
-                    composable(Screen.SessionSummary.route) {
-                        completedSession?.let { session ->
-                            SessionSummaryScreen(
-                                completedSession = session,
-                            onStartNewSession = {
-                                navController.navigate(Screen.TrainingConfig.route) {
-                                    popUpTo(Screen.TrainingConfig.route) { inclusive = true }
-                                }
-                            },
-                            onBackToSensors = {
-                                selectedTab = AppTab.SENSORS
-                            }
-                            )
-                        } ?: run {
-                            // If no completed session, navigate back to config
-                            LaunchedEffect(Unit) {
-                                navController.popBackStack()
-                            }
-                        }
-                    }
-                }
+                TrainingNav(
+                    sensorInterface = sensorInterface
+                )
             }
         }
     }
