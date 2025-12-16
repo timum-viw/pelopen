@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
@@ -23,6 +25,7 @@ import java.util.*
 @Composable
 fun TrainingConfigScreen(
     onStartSession: (WorkoutPlan) -> Unit = {},
+    onReviewSession: (TrainingSession) -> Unit = {},
     viewModel: TrainingConfigViewModel = viewModel()
 ) {
     var selectedDurationMinutes by remember { mutableStateOf(30) }
@@ -176,7 +179,11 @@ fun TrainingConfigScreen(
                         if (uiState.savedSessions.isNotEmpty()) {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(uiState.savedSessions) { session ->
-                                    SessionItem(session = session, onClick = { onStartSession(session.workoutPlan) })
+                                    SessionItem(
+                                        session = session, 
+                                        onClick = { onStartSession(session.workoutPlan) },
+                                        onReview = { onReviewSession(session) }
+                                    )
                                 }
                             }
                         } else {
@@ -192,28 +199,40 @@ fun TrainingConfigScreen(
 }
 
 @Composable
-private fun SessionItem(session: TrainingSession, onClick: () -> Unit) {
+private fun SessionItem(session: TrainingSession, onClick: () -> Unit, onReview: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = session.workoutPlan.name ?: "Unnamed Workout",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${session.workoutPlan.totalDurationSeconds / 60} min - Intensity ${session.workoutPlan.intensityLevel}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(session.sessionStartTime)),
-                style = MaterialTheme.typography.bodySmall
-            )
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = session.workoutPlan.name ?: "Unnamed Workout",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${session.workoutPlan.totalDurationSeconds / 60} min - Intensity ${session.workoutPlan.intensityLevel}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(session.sessionStartTime)),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = onReview) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Review session"
+                )
+            }
         }
     }
 }

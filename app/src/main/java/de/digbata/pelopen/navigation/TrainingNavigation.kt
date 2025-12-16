@@ -35,6 +35,10 @@ fun TrainingNav(
                 onStartSession = { workoutPlan ->
                     selectedWorkoutPlan = workoutPlan
                     navController.navigate(Screen.TrainingSession.route)
+                },
+                onReviewSession = { session ->
+                    completedSession = session
+                    navController.navigate(Screen.SessionSummary.route)
                 }
             )
         }
