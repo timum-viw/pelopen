@@ -44,13 +44,15 @@ fun PlanFitCard(
     }
     
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = containerColor
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(

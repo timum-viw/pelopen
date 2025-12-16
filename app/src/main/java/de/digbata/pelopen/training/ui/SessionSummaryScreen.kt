@@ -47,21 +47,30 @@ fun SessionSummaryScreen(
         
         // Overall Stats Cards
         if (performance != null && evaluation != null) {
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max)
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Plan Fit Assessment Card
                 PlanFitCard(
                     assessment = performance.planDifficultyAssessment,
                     cadenceFit = performance.overallCadenceFit,
-                    resistanceFit = performance.overallResistanceFit
+                    resistanceFit = performance.overallResistanceFit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
                 
                 // Overall Stats Card
                 OverallStatsCard(
                     performance = performance,
-                    evaluation = evaluation
+                    evaluation = evaluation,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
             }
         } else {
@@ -165,13 +174,15 @@ private fun OverallStatsCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
