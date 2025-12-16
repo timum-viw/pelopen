@@ -45,6 +45,7 @@ fun TrainingSessionScreen(
     }
     var cadence by remember { mutableStateOf(0f) }
     var resistance by remember { mutableStateOf(0f) }
+    var power by remember { mutableStateOf(0f) }
     
     val sessionState by viewModel.sessionState.collectAsState()
     val totalRemainingTime by viewModel.totalRemainingTimeSeconds.collectAsState()
@@ -74,13 +75,19 @@ fun TrainingSessionScreen(
         launch {
             sensorInterface.cadence.collect { cadenceValue ->
                 cadence = cadenceValue
-                viewModel.updateSensorValues(cadence, resistance)
+                viewModel.updateSensorValues(cadence, resistance, power)
             }
         }
         launch {
             sensorInterface.resistance.collect { resistanceValue ->
                 resistance = resistanceValue
-                viewModel.updateSensorValues(cadence, resistance)
+                viewModel.updateSensorValues(cadence, resistance, power)
+            }
+        }
+        launch {
+            sensorInterface.power.collect { powerValue ->
+                power = powerValue
+                viewModel.updateSensorValues(cadence, resistance, power)
             }
         }
     }
@@ -372,6 +379,24 @@ fun TrainingSessionScreen(
                         )
                     }
                 }
+                
+                // Power Display
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Power",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${power.toInt()} W",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -477,4 +502,3 @@ private fun getStatusText(status: TargetStatus): String {
         TargetStatus.AboveMax -> "Above Target"
     }
 }
-

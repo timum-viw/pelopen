@@ -75,6 +75,7 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
     // Sensor values
     private var currentCadence: Float = 0f
     private var currentResistance: Float = 0f
+    private var currentPower: Float = 0f
     
     /**
      * Start a new training session with a workout plan
@@ -319,6 +320,7 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
                             timestamp = totalElapsedMillis,
                             cadence = currentCadence,
                             resistance = currentResistance,
+                            power = currentPower,
                             intervalIndex = currentIntervalIndex,
                             intervalElapsedSeconds = intervalElapsedSeconds
                         )
@@ -350,9 +352,10 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
     /**
      * Update sensor values and compare with targets
      */
-    fun updateSensorValues(cadence: Float, resistance: Float) {
+    fun updateSensorValues(cadence: Float, resistance: Float, power: Float) {
         currentCadence = cadence
         currentResistance = resistance
+        currentPower = power
         
         val currentInterval = _currentInterval.value
         if (currentInterval != null) {
