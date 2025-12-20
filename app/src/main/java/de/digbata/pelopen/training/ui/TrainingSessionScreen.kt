@@ -103,7 +103,7 @@ fun TrainingSessionScreen(
     // Handle session completion
     LaunchedEffect(sessionState) {
         if (sessionState is TrainingSessionState.Completed) {
-            viewModel.getSession()?.let { session ->
+            (sessionState as TrainingSessionState.Completed).session?.let { session ->
                 onEndSession(session)
             }
         }
@@ -442,9 +442,6 @@ fun TrainingSessionScreen(
                 text = { Text("Your progress will be lost.") },
                 confirmButton = {
                     TextButton(onClick = {
-                        viewModel.getSession()?.let { session ->
-                            onEndSession(session)
-                        }
                         viewModel.endSession(completed = false)
                         showExitDialog = false
                     }) {

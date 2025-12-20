@@ -17,15 +17,14 @@ import timber.log.Timber
  */
 sealed class TrainingSessionState {
     object Idle : TrainingSessionState()
-    object Loading : TrainingSessionState()
-    object Configuring : TrainingSessionState()
     data class Active(
         val workoutPlan: WorkoutPlan,
         val currentIntervalIndex: Int,
         val isPaused: Boolean
     ) : TrainingSessionState()
-    object Completed : TrainingSessionState()
-    data class Error(val message: String) : TrainingSessionState()
+    data class Completed(
+        val session: TrainingSession? = null
+    ) : TrainingSessionState()
 }
 
 /**
@@ -346,7 +345,7 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             it.end(completed)
             sessionRepository.saveSession(it)
         }
-        _sessionState.value = TrainingSessionState.Completed
+        _sessionState.value = TrainingSessionState.Completed(session)
     }
     
     /**
@@ -382,13 +381,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             actual > targetMax -> TargetStatus.AboveMax
             else -> TargetStatus.WithinRange
         }
-    }
-    
-    /**
-     * Get the current training session (if available)
-     */
-    fun getSession(): TrainingSession? {
-        return session
     }
     
     /**
