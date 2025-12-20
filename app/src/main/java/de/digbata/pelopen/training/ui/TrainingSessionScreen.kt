@@ -173,10 +173,11 @@ fun TrainingSessionScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Previous Interval
+                val hasPreviousInterval = previousInterval != null
                 Card(
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(if (hasPreviousInterval) 0.5f else 0.0f)
                     )
                 ) {
                     Column(
@@ -184,10 +185,13 @@ fun TrainingSessionScreen(
                             .padding(16.dp)
                             .alpha(0.6f)
                     ) {
+                        val textColor = if (hasPreviousInterval)
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy()
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.0f)
                         Text(
                             text = "Previous Interval",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         previousInterval?.let { prev ->
@@ -252,10 +256,11 @@ fun TrainingSessionScreen(
                 }
                 
                 // Next Interval Preview
+                val hasNextInterval = nextInterval != null
                 Card(
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(if(hasNextInterval) 0.5f else 0.0f)
                     )
                 ) {
                     Column(
@@ -263,10 +268,13 @@ fun TrainingSessionScreen(
                             .padding(16.dp)
                             .alpha(0.6f)
                     ) {
+                        val textColor = if (hasNextInterval)
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy()
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.0f)
                         Text(
                             text = "Next Interval",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = textColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         nextInterval?.let { next ->
