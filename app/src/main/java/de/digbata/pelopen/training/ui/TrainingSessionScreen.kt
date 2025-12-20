@@ -25,7 +25,6 @@ import de.digbata.pelopen.training.TrainingSessionViewModel
 import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.data.TrainingSession
 import com.spop.peloton.sensors.interfaces.SensorInterface
-import kotlinx.coroutines.flow.collect
 import java.util.concurrent.TimeUnit
 
 /**
@@ -52,6 +51,7 @@ fun TrainingSessionScreen(
     val intervalRemainingTime by viewModel.currentIntervalRemainingSeconds.collectAsState()
     val currentInterval by viewModel.currentInterval.collectAsState()
     val nextInterval by viewModel.nextInterval.collectAsState()
+    val previousInterval by viewModel.previousInterval.collectAsState()
     val cadenceStatus by viewModel.cadenceStatus.collectAsState()
     val resistanceStatus by viewModel.resistanceStatus.collectAsState()
     val sessionProgress by viewModel.sessionProgress.collectAsState()
@@ -60,16 +60,8 @@ fun TrainingSessionScreen(
     // Get workout plan and current interval index from active state
     val activeState = sessionState as? TrainingSessionState.Active
     val workoutPlan = activeState?.workoutPlan
-    val currentIntervalIndex = activeState?.currentIntervalIndex ?: 0
     val intervals = workoutPlan?.intervals ?: emptyList()
-    
-    // Calculate previous interval
-    val previousInterval = if (currentIntervalIndex > 0) {
-        intervals.getOrNull(currentIntervalIndex - 1)
-    } else {
-        null
-    }
-    
+
     // Collect sensor values
     LaunchedEffect(sensorInterface) {
         launch {
@@ -157,8 +149,8 @@ fun TrainingSessionScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    intervals.forEachIndexed { index, _ ->
-                        val isCurrentInterval = index == currentIntervalIndex
+                    intervals.forEachIndexed { index, interval ->
+                        val isCurrentInterval = interval == currentInterval
                         Box(
                             modifier = Modifier
                                 .size(if (isCurrentInterval) 12.dp else 8.dp)

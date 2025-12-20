@@ -19,7 +19,6 @@ sealed class TrainingSessionState {
     object Idle : TrainingSessionState()
     data class Active(
         val workoutPlan: WorkoutPlan,
-        val currentIntervalIndex: Int,
         val isPaused: Boolean
     ) : TrainingSessionState()
     data class Completed(
@@ -48,6 +47,9 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
     
     private val _nextInterval = MutableStateFlow<WorkoutInterval?>(null)
     val nextInterval: StateFlow<WorkoutInterval?> = _nextInterval.asStateFlow()
+
+    private val _previousInterval = MutableStateFlow<WorkoutInterval?>(null)
+    val previousInterval: StateFlow<WorkoutInterval?> = _previousInterval.asStateFlow()
     
     private val _cadenceStatus = MutableStateFlow<TargetStatus>(TargetStatus.WithinRange)
     val cadenceStatus: StateFlow<TargetStatus> = _cadenceStatus.asStateFlow()
@@ -97,7 +99,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             
             _sessionState.value = TrainingSessionState.Active(
                 workoutPlan = workoutPlan,
-                currentIntervalIndex = 0,
                 isPaused = false
             )
             
@@ -203,6 +204,11 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
         val intervals = currentSession.workoutPlan.intervals
         
         if (currentIntervalIndex < intervals.size) {
+            // set previous interval
+            if(currentIntervalIndex > 0) {
+                _previousInterval.value = intervals[currentIntervalIndex - 1]
+            }
+
             val workoutInterval = intervals[currentIntervalIndex]
             _currentInterval.value = workoutInterval
             Timber.d("Updated current interval to index $currentIntervalIndex: ${workoutInterval.name}, duration=${workoutInterval.durationSeconds}s")
@@ -239,7 +245,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
                     workoutPlan = currentSession.workoutPlan,
-                    currentIntervalIndex = currentIntervalIndex,
                     isPaused = isPaused
                 )
             }
@@ -262,7 +267,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
                     workoutPlan = currentSession.workoutPlan,
-                    currentIntervalIndex = currentState.currentIntervalIndex,
                     isPaused = true
                 )
             }
@@ -287,7 +291,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
                     workoutPlan = currentSession.workoutPlan,
-                    currentIntervalIndex = currentState.currentIntervalIndex,
                     isPaused = false
                 )
             }
