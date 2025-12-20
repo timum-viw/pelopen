@@ -18,7 +18,6 @@ import timber.log.Timber
 sealed class TrainingSessionState {
     object Idle : TrainingSessionState()
     data class Active(
-        val workoutPlan: WorkoutPlan,
         val isPaused: Boolean
     ) : TrainingSessionState()
     data class Completed(
@@ -98,7 +97,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             Timber.d("Updated intervals: current=${_currentInterval.value?.name}, next=${_nextInterval.value?.name}")
             
             _sessionState.value = TrainingSessionState.Active(
-                workoutPlan = workoutPlan,
                 isPaused = false
             )
             
@@ -239,15 +237,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
         if (currentIntervalIndex + 1 < intervals.size) {
             currentIntervalIndex++
             updateIntervals()
-            
-            // Update state
-            val currentState = _sessionState.value
-            if (currentState is TrainingSessionState.Active) {
-                _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = currentSession.workoutPlan,
-                    isPaused = isPaused
-                )
-            }
         } else {
             // No more intervals, session complete
             endSession(completed = true)
@@ -258,7 +247,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
      * Pause the session
      */
     fun pauseSession() {
-        val currentSession = session ?: return
         if (!isPaused) {
             isPaused = true
             pauseStartTime = System.currentTimeMillis()
@@ -266,7 +254,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = currentSession.workoutPlan,
                     isPaused = true
                 )
             }
@@ -290,7 +277,6 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
             val currentState = _sessionState.value
             if (currentState is TrainingSessionState.Active) {
                 _sessionState.value = TrainingSessionState.Active(
-                    workoutPlan = currentSession.workoutPlan,
                     isPaused = false
                 )
             }

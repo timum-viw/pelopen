@@ -57,10 +57,8 @@ fun TrainingSessionScreen(
     val sessionProgress by viewModel.sessionProgress.collectAsState()
     val showIntervalNotification by viewModel.showIntervalChangeNotification.collectAsState()
     
-    // Get workout plan and current interval index from active state
-    val activeState = sessionState as? TrainingSessionState.Active
-    val workoutPlan = activeState?.workoutPlan
-    val intervals = workoutPlan?.intervals ?: emptyList()
+    val isPaused = (sessionState as? TrainingSessionState.Active)?.isPaused ?: false
+    val intervals = workoutPlan.intervals
 
     // Collect sensor values
     LaunchedEffect(sensorInterface) {
@@ -398,30 +396,27 @@ fun TrainingSessionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (activeState != null) {
-                    val isPaused = activeState.isPaused
-                    Button(
-                        onClick = {
-                            if (isPaused) {
-                                viewModel.resumeSession()
-                            } else {
-                                viewModel.pauseSession()
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (isPaused) "Resume" else "Pause")
-                    }
-                    
-                    Button(
-                        onClick = { showExitDialog = true },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("End Session")
-                    }
+                Button(
+                    onClick = {
+                        if (isPaused) {
+                            viewModel.resumeSession()
+                        } else {
+                            viewModel.pauseSession()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (isPaused) "Resume" else "Pause")
+                }
+
+                Button(
+                    onClick = { showExitDialog = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("End Session")
                 }
             }
         }
