@@ -12,5 +12,5 @@ data class SessionDataPoint(
     val resistance: Float,
     val power: Float? = null,
     val intervalIndex: Int,
-    val intervalElapsedSeconds: Int
+    val intervalElapsedSeconds: Int = 0
 )

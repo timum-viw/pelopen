@@ -26,5 +26,17 @@ data class TrainingSession(
         sessionEndTime = System.currentTimeMillis()
         wasCompleted = completed
     }
+
+    fun calculateTotalElapsedMillis(time: Long = System.currentTimeMillis()): Long {
+        val totalElapsed = (time - this.sessionStartTime) - (this.pausedSeconds * 1000)
+        return maxOf(0L, totalElapsed)
+    }
+
+    fun calculateIntervalElapsed(interval: WorkoutInterval): Long {
+        val totalElapsedMillis = this.calculateTotalElapsedMillis()
+        val previousIntervalsDurationMillis = this.workoutPlan.intervals.takeWhile { it != interval }.sumOf { it.durationSeconds.toLong() * 1000 }
+        val intervalElapsedMillis = maxOf(0L, totalElapsedMillis - previousIntervalsDurationMillis)
+        return intervalElapsedMillis
+    }
 }
 

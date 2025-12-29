@@ -47,17 +47,18 @@ fun TrainingSessionScreen(
     var power by remember { mutableStateOf(0f) }
     
     val sessionState by viewModel.sessionState.collectAsState()
-    val totalRemainingTime by viewModel.totalRemainingTimeSeconds.collectAsState()
-    val intervalRemainingTime by viewModel.currentIntervalRemainingSeconds.collectAsState()
-    val currentInterval by viewModel.currentInterval.collectAsState()
-    val nextInterval by viewModel.nextInterval.collectAsState()
-    val previousInterval by viewModel.previousInterval.collectAsState()
-    val cadenceStatus by viewModel.cadenceStatus.collectAsState()
-    val resistanceStatus by viewModel.resistanceStatus.collectAsState()
-    val sessionProgress by viewModel.sessionProgress.collectAsState()
-    val showIntervalNotification by viewModel.showIntervalChangeNotification.collectAsState()
+    val activeState = sessionState as? TrainingSessionState.Active
+    val totalRemainingTime = activeState?.totalRemainingTimeSeconds ?: 0L
+    val intervalRemainingTime = activeState?.currentIntervalRemainingSeconds ?: 0L
+    val currentInterval = activeState?.currentInterval
+    val nextInterval = activeState?.nextInterval
+    val previousInterval = activeState?.previousInterval
+    val cadenceStatus = activeState?.cadenceStatus ?: TargetStatus.WithinRange
+    val resistanceStatus = activeState?.resistanceStatus ?: TargetStatus.WithinRange
+    val sessionProgress = activeState?.sessionProgress ?: 0f
+    val showIntervalNotification = activeState?.showIntervalChangeNotification ?: false
     
-    val isPaused = (sessionState as? TrainingSessionState.Active)?.isPaused ?: false
+    val isPaused = activeState?.isPaused ?: false
     val intervals = workoutPlan.intervals
 
     // Collect sensor values
@@ -92,10 +93,9 @@ fun TrainingSessionScreen(
     
     // Handle session completion
     LaunchedEffect(sessionState) {
-        if (sessionState is TrainingSessionState.Completed) {
-            (sessionState as TrainingSessionState.Completed).session?.let { session ->
-                onEndSession(session)
-            }
+        val state = sessionState as? TrainingSessionState.Completed
+        state?.session?.let { session ->
+            onEndSession(session)
         }
     }
     
