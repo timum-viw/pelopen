@@ -2,6 +2,7 @@ package de.digbata.pelopen.training.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -53,144 +54,175 @@ fun TrainingConfigScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 24.dp)
         )
+        Row(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Create a new session",
+                    style = MaterialTheme.typography.titleLarge
+                )
 
-        when {
-            uiState.isLoading -> {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator()
-                    Text("Loading workout plan…")
-                }
-            }
-            uiState.errorMessage != null -> {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Text(
-                        text = uiState.errorMessage ?: "Unknown error",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = {
-                        val durationSeconds = selectedDurationMinutes * 60
-                        viewModel.fetchWorkoutPlan(durationSeconds, selectedIntensity)
-                    }) {
-                        Text("Retry")
-                    }
-                }
-            }
-            else -> {
-                Row(Modifier.fillMaxSize()) {
-                    // Left Column: Create new session
+                // Duration selection
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text("Create a new session", style = MaterialTheme.typography.titleLarge)
-
-                        // Duration selection
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Select Duration",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    QuickDurationButton(30, selectedDurationMinutes == 30, { selectedDurationMinutes = 30 }, Modifier.weight(1f))
-                                    QuickDurationButton(45, selectedDurationMinutes == 45, { selectedDurationMinutes = 45 }, Modifier.weight(1f))
-                                    QuickDurationButton(60, selectedDurationMinutes == 60, { selectedDurationMinutes = 60 }, Modifier.weight(1f))
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("${selectedDurationMinutes} minutes")
-                                Slider(
-                                    value = selectedDurationMinutes.toFloat(),
-                                    onValueChange = { selectedDurationMinutes = it.toInt() },
-                                    valueRange = 15f..90f,
-                                    steps = 14,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-
-                        // Intensity selection
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Select Intensity",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    IntensityButton("Low", 3, selectedIntensity == 3, { selectedIntensity = 3 }, Modifier.weight(1f))
-                                    IntensityButton("Mid", 6, selectedIntensity == 6, { selectedIntensity = 6 }, Modifier.weight(1f))
-                                    IntensityButton("High", 8, selectedIntensity == 8, { selectedIntensity = 8 }, Modifier.weight(1f))
-                                }
-                            }
-                        }
-                        
-                        Spacer(Modifier.weight(1f))
-
-                        // Start button
-                        Button(
-                            onClick = {
-                                val durationSeconds = selectedDurationMinutes * 60
-                                viewModel.fetchWorkoutPlan(durationSeconds, selectedIntensity)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !uiState.isLoading
-                        ) {
-                            Text("Start Training", style = MaterialTheme.typography.titleLarge)
-                        }
-                    }
-
-                    // Divider
-                    Divider(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                    )
-
-                    // Right Column: Saved sessions
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 12.dp),
+                        modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Or repeat a previous session", style = MaterialTheme.typography.titleLarge)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        if (uiState.savedSessions.isNotEmpty()) {
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(uiState.savedSessions) { session ->
-                                    SessionItem(
-                                        session = session, 
-                                        onClick = { onStartSession(session.workoutPlan) },
-                                        onReview = { onReviewSession(session) }
-                                    )
-                                }
-                            }
-                        } else {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("No saved sessions yet.")
-                            }
+                        Text(
+                            text = "Select Duration",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickDurationButton(
+                                30,
+                                selectedDurationMinutes == 30,
+                                { selectedDurationMinutes = 30 },
+                                Modifier.weight(1f)
+                            )
+                            QuickDurationButton(
+                                45,
+                                selectedDurationMinutes == 45,
+                                { selectedDurationMinutes = 45 },
+                                Modifier.weight(1f)
+                            )
+                            QuickDurationButton(
+                                60,
+                                selectedDurationMinutes == 60,
+                                { selectedDurationMinutes = 60 },
+                                Modifier.weight(1f)
+                            )
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("${selectedDurationMinutes} minutes")
+                        Slider(
+                            value = selectedDurationMinutes.toFloat(),
+                            onValueChange = { selectedDurationMinutes = it.toInt() },
+                            valueRange = 15f..90f,
+                            steps = 14,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Intensity selection
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Select Intensity",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IntensityButton(
+                                "Low",
+                                3,
+                                selectedIntensity == 3,
+                                { selectedIntensity = 3 },
+                                Modifier.weight(1f)
+                            )
+                            IntensityButton(
+                                "Mid",
+                                6,
+                                selectedIntensity == 6,
+                                { selectedIntensity = 6 },
+                                Modifier.weight(1f)
+                            )
+                            IntensityButton(
+                                "High",
+                                8,
+                                selectedIntensity == 8,
+                                { selectedIntensity = 8 },
+                                Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                when {
+                    uiState.isLoading -> {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            CircularProgressIndicator()
+                            Text("Loading workout plan…")
+                        }
+                    }
+
+                    uiState.errorMessage != null -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = uiState.errorMessage ?: "Unknown error",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+                // Start button
+                Button(
+                    onClick = {
+                        val durationSeconds = selectedDurationMinutes * 60
+                        viewModel.fetchWorkoutPlan(durationSeconds, selectedIntensity)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("Start Training", style = MaterialTheme.typography.titleLarge)
+                }
+            }
+
+            // Divider
+            Divider(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+            )
+
+            // Right Column: Saved sessions
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Or repeat a previous session", style = MaterialTheme.typography.titleLarge)
+                Spacer(modifier = Modifier.height(16.dp))
+                if (uiState.savedSessions.isNotEmpty()) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(uiState.savedSessions) { session ->
+                            SessionItem(
+                                session = session,
+                                onClick = { onStartSession(session.workoutPlan) },
+                                onReview = { onReviewSession(session) }
+                            )
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No saved sessions yet.")
                     }
                 }
             }
