@@ -1,5 +1,6 @@
 package de.digbata.pelopen.training.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,10 +9,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import de.digbata.pelopen.training.data.TrainingSession
 import de.digbata.pelopen.training.SessionEvaluator
+import de.digbata.pelopen.training.data.TrainingSession
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,9 +33,9 @@ fun SessionSummaryScreen(
     val evaluation = remember(performance) {
         performance?.let { sessionEvaluator.evaluateSession(it) }
     }
-    
+
     val scrollState = rememberScrollState()
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -44,7 +47,7 @@ fun SessionSummaryScreen(
             performance = performance,
             modifier = Modifier.padding(24.dp)
         )
-        
+
         // Overall Stats Cards
         if (performance != null && evaluation != null) {
             Row(
@@ -63,7 +66,7 @@ fun SessionSummaryScreen(
                         .weight(1f)
                         .fillMaxHeight()
                 )
-                
+
                 // Overall Stats Card
                 OverallStatsCard(
                     performance = performance,
@@ -99,9 +102,40 @@ fun SessionSummaryScreen(
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
+        // Graphs
+        if (completedSession.dataPoints.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                MetricGraphCard(
+                    title = "Cadence",
+                    session = completedSession,
+                    dataSelector = { it.cadence },
+                    modifier = Modifier.weight(1f)
+                )
+                MetricGraphCard(
+                    title = "Resistance",
+                    session = completedSession,
+                    dataSelector = { it.resistance },
+                    modifier = Modifier.weight(1f)
+                )
+                MetricGraphCard(
+                    title = "Power",
+                    session = completedSession,
+                    dataSelector = { it.power },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // Action Buttons
         Column(
             modifier = Modifier
@@ -127,7 +161,7 @@ private fun HeaderSection(
 ) {
     val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault())
     val sessionDate = dateFormat.format(Date(session.sessionStartTime))
-    
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -137,7 +171,7 @@ private fun HeaderSection(
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )
-        
+
         // Session name or ID
         if (session.workoutPlan.name != null) {
             Text(
@@ -146,14 +180,14 @@ private fun HeaderSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
+
         // Date and time
         Text(
             text = sessionDate,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        
+
         // Duration
         performance?.let {
             val minutes = it.actualDurationSeconds / 60
@@ -190,9 +224,9 @@ private fun OverallStatsCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            
+
             Divider()
-            
+
             // Intervals completed
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -208,7 +242,7 @@ private fun OverallStatsCard(
                     fontWeight = FontWeight.Bold
                 )
             }
-            
+
             // Interval breakdown
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -225,7 +259,7 @@ private fun OverallStatsCard(
                     fontWeight = FontWeight.Bold
                 )
             }
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -241,7 +275,7 @@ private fun OverallStatsCard(
                     fontWeight = FontWeight.Bold
                 )
             }
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -261,3 +295,114 @@ private fun OverallStatsCard(
     }
 }
 
+@Composable
+private fun MetricGraphCard(
+    title: String,
+    session: TrainingSession,
+    dataSelector: (de.digbata.pelopen.training.data.SessionDataPoint) -> Float?,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val data = session.dataPoints.map(dataSelector)
+            val validData = data.mapNotNull { it }
+
+            if (validData.size < 2) {
+                Box(
+                    modifier = Modifier.height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Not enough data", style = MaterialTheme.typography.bodySmall)
+                }
+            } else {
+                val maxValue = validData.maxOrNull() ?: 0f
+                val minValue = validData.minOrNull() ?: 0f
+                val durationSeconds = (session.dataPoints.lastOrNull()?.timestamp ?: 0L) / 1000
+
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text = "%.0f".format(maxValue),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+
+                    LineGraph(
+                        data = data,
+                        modifier = Modifier
+                            .height(80.dp)
+                            .fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "%.0f".format(minValue),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "0:00",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+
+                        val minutes = durationSeconds / 60
+                        val seconds = durationSeconds % 60
+                        Text(
+                            text = "%d:%02d".format(minutes.toInt(), seconds.toInt()),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LineGraph(
+    data: List<Float?>,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    Canvas(modifier = modifier) {
+        val validData = data.mapNotNull { it }
+        if (validData.size < 2) {
+            // Not enough data to draw a line
+            return@Canvas
+        }
+
+        val maxValue = validData.maxOrNull() ?: 0f
+        val minValue = validData.minOrNull() ?: 0f
+        val range = (maxValue - minValue).coerceAtLeast(1f)
+
+        val path = Path()
+
+        validData.forEachIndexed { index, value ->
+            val x = size.width * (index.toFloat() / (validData.size - 1))
+            val y = size.height * (1 - ((value - minValue) / range))
+
+            if (index == 0) {
+                path.moveTo(x, y)
+            } else {
+                path.lineTo(x, y)
+            }
+        }
+
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = 2.dp.toPx())
+        )
+    }
+}
