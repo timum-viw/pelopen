@@ -19,6 +19,7 @@ import de.digbata.pelopen.training.data.TrainingSession
 import de.digbata.pelopen.training.data.WorkoutPlan
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToInt
 
 /**
  * Screen for configuring training session (duration and intensity selection)
@@ -249,7 +250,7 @@ private fun SessionItem(session: TrainingSession, onClick: () -> Unit, onReview:
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${session.workoutPlan.totalDurationSeconds / 60} min - Intensity ${session.workoutPlan.intensityLevel}",
+                    text = "${session.workoutPlan.totalDurationSeconds / 60} min - Intensity ${session.workoutPlan.intensityLevel} - Energy ${session.calculateTotalPowerInKcal().roundToInt()} kcal",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(4.dp))

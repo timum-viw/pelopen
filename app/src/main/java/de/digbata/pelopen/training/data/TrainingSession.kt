@@ -38,5 +38,10 @@ data class TrainingSession(
         val intervalElapsedMillis = maxOf(0L, totalElapsedMillis - previousIntervalsDurationMillis)
         return intervalElapsedMillis
     }
+
+    fun calculateTotalPowerInKcal(): Double {
+        return dataPoints.sumOf { (it.power ?: 0).toDouble() } / 4186.8
+    }
+
 }
 
