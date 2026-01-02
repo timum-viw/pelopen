@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.digbata.pelopen.training.SessionEvaluator
 import de.digbata.pelopen.training.data.TrainingSession
+import de.digbata.pelopen.training.data.SessionDataPoint
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -113,22 +114,23 @@ fun SessionSummaryScreen(
                     .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                val durationSeconds = (completedSession.dataPoints.lastOrNull()?.timestamp ?: 0L) / 1000
                 MetricGraphCard(
                     title = "Cadence",
-                    session = completedSession,
-                    dataSelector = { it.cadence },
+                    durationSeconds = durationSeconds,
+                    data = completedSession.dataPoints.map { it.cadence },
                     modifier = Modifier.weight(1f)
                 )
                 MetricGraphCard(
                     title = "Resistance",
-                    session = completedSession,
-                    dataSelector = { it.resistance },
+                    durationSeconds = durationSeconds,
+                    data = completedSession.dataPoints.map { it.resistance },
                     modifier = Modifier.weight(1f)
                 )
                 MetricGraphCard(
                     title = "Power",
-                    session = completedSession,
-                    dataSelector = { it.power },
+                    durationSeconds = durationSeconds,
+                    data = completedSession.dataPoints.mapNotNull { it.power },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -298,8 +300,8 @@ private fun OverallStatsCard(
 @Composable
 private fun MetricGraphCard(
     title: String,
-    session: TrainingSession,
-    dataSelector: (de.digbata.pelopen.training.data.SessionDataPoint) -> Float?,
+    durationSeconds: Long = 0,
+    data: List<Float> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier) {
@@ -314,7 +316,6 @@ private fun MetricGraphCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            val data = session.dataPoints.map(dataSelector)
             val validData = data.mapNotNull { it }
 
             if (validData.size < 2) {
@@ -327,7 +328,6 @@ private fun MetricGraphCard(
             } else {
                 val maxValue = validData.maxOrNull() ?: 0f
                 val minValue = validData.minOrNull() ?: 0f
-                val durationSeconds = (session.dataPoints.lastOrNull()?.timestamp ?: 0L) / 1000
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
