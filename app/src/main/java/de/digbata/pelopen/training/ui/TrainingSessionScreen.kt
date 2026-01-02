@@ -323,9 +323,13 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = getStatusColor(cadenceStatus)
                         )
+                        val lastCadence = cadence?.lastOrNull()?.x ?: 0f
                         MetricGraphCard(
                             title = null,
-                            data = cadence.takeLast(200)
+                            data = cadence.takeLastWhile {
+                                it.x > lastCadence - 20f
+                            },
+                            yDomain = 0f..200f
                         )
                     }
                 }
@@ -363,9 +367,13 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = getStatusColor(resistanceStatus)
                         )
+                        val lastResistance = resistance?.lastOrNull()?.x ?: 0f
                         MetricGraphCard(
                             title = null,
-                            data = resistance.takeLast(200)
+                            data = resistance.takeLastWhile {
+                                it.x > lastResistance - 20f
+                            },
+                            yDomain = 0f..80f
                         )
                     }
                 }
@@ -386,9 +394,13 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
+                        val lastPower = power?.lastOrNull()?.x ?: 0f
                         MetricGraphCard(
                             title = null,
-                            data = power.takeLast(200)
+                            data = power.takeLastWhile {
+                                it.x > lastPower - 20f
+                            },
+                            yDomain = 0f..300f
                         )
                     }
                 }

@@ -28,6 +28,7 @@ data class DataPoint(val x: Float, val y: Float)
 fun MetricGraphCard(
     title: String? = null,
     durationSeconds: Long = 0,
+    yDomain: ClosedFloatingPointRange<Float>? = null,
     data: List<DataPoint> = emptyList(),
     modifier: Modifier = Modifier
 ) {
@@ -53,8 +54,8 @@ fun MetricGraphCard(
                     Text("Not enough data", style = MaterialTheme.typography.bodySmall)
                 }
             } else {
-                val maxValue = data.maxOfOrNull { it.y } ?: 0f
-                val minValue = data.minOfOrNull { it.y } ?: 0f
+                val maxValue = yDomain?.endInclusive ?: data.maxOfOrNull { it.y } ?: 0f
+                val minValue = yDomain?.start ?: data.minOfOrNull { it.y } ?: 0f
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
@@ -71,6 +72,7 @@ fun MetricGraphCard(
                     LineGraph(
                         data = data,
                         xRange = xStart..xEnd,
+                        yRange = minValue..maxValue,
                         modifier = Modifier
                             .height(80.dp)
                             .fillMaxWidth()
@@ -109,6 +111,7 @@ fun MetricGraphCard(
 private fun LineGraph(
     data: List<DataPoint>,
     xRange: ClosedFloatingPointRange<Float>,
+    yRange: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
@@ -118,16 +121,14 @@ private fun LineGraph(
             return@Canvas
         }
 
-        val yMax = data.maxOfOrNull { it.y } ?: 0f
-        val yMin = data.minOfOrNull { it.y } ?: 0f
-        val yRange = (yMax - yMin).coerceAtLeast(1f)
+        val yRangeValue = (yRange.endInclusive - yRange.start).coerceAtLeast(1f)
         val xRangeValue = (xRange.endInclusive - xRange.start).coerceAtLeast(1f)
 
         val path = Path()
 
         fun scalePoint(point: DataPoint): Pair<Float, Float> {
             val x = size.width * ((point.x - xRange.start) / xRangeValue)
-            val y = size.height * (1 - ((point.y - yMin) / yRange))
+            val y = size.height * (1 - ((point.y - yRange.start) / yRangeValue))
             return x to y
         }
 
