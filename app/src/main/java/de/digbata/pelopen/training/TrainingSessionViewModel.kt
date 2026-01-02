@@ -2,8 +2,12 @@ package de.digbata.pelopen.training
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.spop.peloton.sensors.interfaces.SensorInterface
 import de.digbata.pelopen.training.data.*
+import de.digbata.pelopen.training.ui.DataPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +15,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+
+class ViewModelFactory(private val application: Application, private val sensorInterface: SensorInterface) : ViewModelProvider.NewInstanceFactory() {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TrainingSessionViewModel::class.java)) {
+            return TrainingSessionViewModel(application, sensorInterface) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 /**
  * Sealed class representing the state of a training session
@@ -27,7 +41,11 @@ sealed class TrainingSessionState {
         val previousInterval: WorkoutInterval? = null,
         val cadenceStatus: TargetStatus = TargetStatus.WithinRange,
         val resistanceStatus: TargetStatus = TargetStatus.WithinRange,
-        val showIntervalChangeNotification: Boolean = false
+        val showIntervalChangeNotification: Boolean = false,
+        val currentCadence: Float = 0f,
+        val currentResistance: Float = 0f,
+        val currentPower: Float = 0f,
+        val sessionData: List<DataPoint> = emptyList()
     ) : TrainingSessionState()
     data class Completed(
         val session: TrainingSession? = null
@@ -37,8 +55,11 @@ sealed class TrainingSessionState {
 /**
  * ViewModel for managing training session state and timer
  */
-class TrainingSessionViewModel(application: Application) : AndroidViewModel(application) {
-    
+class TrainingSessionViewModel(
+    application: Application,
+    private val sensorInterface: SensorInterface
+) : AndroidViewModel(application) {
+
     private val sessionRepository = TrainingSessionRepository(application.applicationContext)
     
     private val _sessionState = MutableStateFlow<TrainingSessionState>(TrainingSessionState.Idle)
@@ -56,7 +77,73 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
     private var currentCadence: Float = 0f
     private var currentResistance: Float = 0f
     private var currentPower: Float = 0f
-    
+
+    init {
+        startObservingSensors()
+    }
+
+    private fun startObservingSensors() {
+        viewModelScope.launch {
+            sensorInterface.cadence.collect {
+                currentCadence = it
+                updateSensorState(newCadenceDataPoint = true)
+            }
+        }
+        viewModelScope.launch {
+            sensorInterface.resistance.collect {
+                currentResistance = it
+                updateSensorState()
+            }
+        }
+        viewModelScope.launch {
+            sensorInterface.power.collect {
+                currentPower = it
+                updateSensorState()
+            }
+        }
+    }
+
+    private fun updateSensorState(newCadenceDataPoint: Boolean = false) {
+        val currentState = _sessionState.value as? TrainingSessionState.Active ?: return
+        val currentInterval = currentState.currentInterval
+
+        val newSessionData = if (newCadenceDataPoint) {
+            val workoutPlan = session?.workoutPlan ?: return
+            val totalRemainingTime = currentState.totalRemainingTimeSeconds
+            currentState.sessionData + DataPoint(
+                (workoutPlan.totalDurationSeconds * 1000L - totalRemainingTime).toFloat(),
+                currentCadence
+            )
+        } else {
+            currentState.sessionData
+        }
+
+        val cadenceStatus = currentInterval?.let {
+            compareValue(
+                actual = currentCadence,
+                targetMin = it.targetCadence.min,
+                targetMax = it.targetCadence.max
+            )
+        } ?: TargetStatus.WithinRange
+
+        val resistanceStatus = currentInterval?.let {
+            compareValue(
+                actual = currentResistance,
+                targetMin = it.targetResistance.min,
+                targetMax = it.targetResistance.max
+            )
+        } ?: TargetStatus.WithinRange
+
+        _sessionState.value = currentState.copy(
+            cadenceStatus = cadenceStatus,
+            resistanceStatus = resistanceStatus,
+            currentCadence = currentCadence,
+            currentResistance = currentResistance,
+            currentPower = currentPower,
+            sessionData = newSessionData
+        )
+    }
+
     /**
      * Start a new training session with a workout plan
      */
@@ -237,36 +324,7 @@ class TrainingSessionViewModel(application: Application) : AndroidViewModel(appl
         }
         _sessionState.value = TrainingSessionState.Completed(session)
     }
-    
-    /**
-     * Update sensor values and compare with targets
-     */
-    fun updateSensorValues(cadence: Float, resistance: Float, power: Float) {
-        currentCadence = cadence
-        currentResistance = resistance
-        currentPower = power
 
-        val currentState = _sessionState.value as? TrainingSessionState.Active ?: return
-        val currentInterval = currentState.currentInterval
-        if (currentInterval != null) {
-            val cadenceStatus = compareValue(
-                actual = cadence,
-                targetMin = currentInterval.targetCadence.min,
-                targetMax = currentInterval.targetCadence.max
-            )
-            
-            val resistanceStatus = compareValue(
-                actual = resistance,
-                targetMin = currentInterval.targetResistance.min,
-                targetMax = currentInterval.targetResistance.max
-            )
-            _sessionState.value = currentState.copy(
-                cadenceStatus = cadenceStatus,
-                resistanceStatus = resistanceStatus
-            )
-        }
-    }
-    
     /**
      * Compare actual value with target range
      */

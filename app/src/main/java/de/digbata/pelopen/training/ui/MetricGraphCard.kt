@@ -64,10 +64,10 @@ fun MetricGraphCard(
                     } else {
                         data.maxOfOrNull { it.x } ?: 0f
                     }
-
+                    val xStart = data.minOfOrNull { it.x } ?: 0f
                     LineGraph(
                         data = data,
-                        xRange = 0f..xEnd,
+                        xRange = xStart..xEnd,
                         modifier = Modifier
                             .height(80.dp)
                             .fillMaxWidth()

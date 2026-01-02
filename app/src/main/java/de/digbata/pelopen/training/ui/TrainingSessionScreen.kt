@@ -1,5 +1,6 @@
 package de.digbata.pelopen.training.ui
 
+import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,19 +14,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.digbata.pelopen.training.TargetStatus
-import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import de.digbata.pelopen.training.data.WorkoutInterval
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
 import de.digbata.pelopen.training.TrainingSessionState
 import de.digbata.pelopen.training.TrainingSessionViewModel
 import de.digbata.pelopen.training.data.WorkoutPlan
 import de.digbata.pelopen.training.data.TrainingSession
 import com.spop.peloton.sensors.interfaces.SensorInterface
-import java.util.concurrent.TimeUnit
+import de.digbata.pelopen.training.ViewModelFactory
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Main training session screen showing timer, progress, and targets
@@ -36,15 +38,14 @@ fun TrainingSessionScreen(
     workoutPlan: WorkoutPlan,
     onEndSession: (TrainingSession) -> Unit = {}
 ) {
-    val viewModel: TrainingSessionViewModel = viewModel()
+    val context = LocalContext.current
+    val application = context.applicationContext as Application
+    val viewModel: TrainingSessionViewModel = viewModel(factory = ViewModelFactory(application, sensorInterface))
     
     // Initialize session when workout plan is provided
     LaunchedEffect(workoutPlan) {
         viewModel.startSession(workoutPlan)
     }
-    var cadence by remember { mutableStateOf(0f) }
-    var resistance by remember { mutableStateOf(0f) }
-    var power by remember { mutableStateOf(0f) }
     
     val sessionState by viewModel.sessionState.collectAsState()
     val activeState = sessionState as? TrainingSessionState.Active
@@ -57,31 +58,13 @@ fun TrainingSessionScreen(
     val resistanceStatus = activeState?.resistanceStatus ?: TargetStatus.WithinRange
     val sessionProgress = activeState?.sessionProgress ?: 0f
     val showIntervalNotification = activeState?.showIntervalChangeNotification ?: false
-    
+    val sessionData = activeState?.sessionData ?: emptyList()
+    val cadence = activeState?.currentCadence ?: 0f
+    val resistance = activeState?.currentResistance ?: 0f
+    val power = activeState?.currentPower ?: 0f
+
     val isPaused = activeState?.isPaused ?: false
     val intervals = workoutPlan.intervals
-
-    // Collect sensor values
-    LaunchedEffect(sensorInterface) {
-        launch {
-            sensorInterface.cadence.collect { cadenceValue ->
-                cadence = cadenceValue
-                viewModel.updateSensorValues(cadence, resistance, power)
-            }
-        }
-        launch {
-            sensorInterface.resistance.collect { resistanceValue ->
-                resistance = resistanceValue
-                viewModel.updateSensorValues(cadence, resistance, power)
-            }
-        }
-        launch {
-            sensorInterface.power.collect { powerValue ->
-                power = powerValue
-                viewModel.updateSensorValues(cadence, resistance, power)
-            }
-        }
-    }
     
     // Handle back navigation
     val isSessionActive = sessionState is TrainingSessionState.Active
@@ -328,10 +311,9 @@ fun TrainingSessionScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        val cadenceUnit = interval?.targetCadence?.unit ?: "RPM"
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${cadence.toInt()} $cadenceUnit",
+                            text = "${cadence.toInt()} RPM",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = getStatusColor(cadenceStatus)
@@ -354,18 +336,19 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        val resistanceInterval: WorkoutInterval? = currentInterval
-                        if (resistanceInterval != null) {
+                        val interval = currentInterval
+                        if (interval != null) {
                             Text(
-                                text = "${resistanceInterval.targetResistance.min.toInt()}-${resistanceInterval.targetResistance.max.toInt()} ${resistanceInterval.targetResistance.unit}",
+                                text = "${interval.targetResistance.min.toInt()}-${interval.targetResistance.max.toInt()} ${interval.targetResistance.unit}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
+                        } else {
+                            Text(text = "—", style = MaterialTheme.typography.titleMedium)
                         }
-                        val resistanceUnit = resistanceInterval?.targetResistance?.unit ?: "%"
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${resistance.toInt()} $resistanceUnit",
+                            text = "${resistance.toInt()} %",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = getStatusColor(resistanceStatus)
@@ -473,9 +456,10 @@ fun TrainingSessionScreen(
 }
 
 private fun formatTime(seconds: Long): String {
-    val minutes = TimeUnit.SECONDS.toMinutes(seconds)
-    val secs = seconds % 60
-    return String.format("%02d:%02d", minutes, secs)
+    val duration = seconds.seconds
+    return duration.toComponents { minutes, seconds, _ ->
+        String.format("%02d:%02d", minutes, seconds)
+    }
 }
 
 @Composable
