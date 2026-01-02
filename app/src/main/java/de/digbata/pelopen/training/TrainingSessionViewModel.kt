@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import de.digbata.pelopen.training.data.*
+import de.digbata.pelopen.training.ui.DataPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.collections.plus
 
 class ViewModelFactory(private val application: Application, private val sensorInterface: SensorInterface) : ViewModelProvider.NewInstanceFactory() {
     @Suppress("UNCHECKED_CAST")
@@ -25,12 +27,6 @@ class ViewModelFactory(private val application: Application, private val sensorI
     }
 }
 
-data class SensorData (
-    val timestamp: Float,
-    val cadence: Float,
-    val resistance: Float,
-    val power: Float
-)
 /**
  * Sealed class representing the state of a training session
  */
@@ -47,7 +43,9 @@ sealed class TrainingSessionState {
         val cadenceStatus: TargetStatus = TargetStatus.WithinRange,
         val resistanceStatus: TargetStatus = TargetStatus.WithinRange,
         val showIntervalChangeNotification: Boolean = false,
-        val sensorData: List<SensorData> = emptyList()
+        val cadence: List<DataPoint> = emptyList(),
+        val resistance: List<DataPoint> = emptyList(),
+        val power: List<DataPoint> = emptyList()
     ) : TrainingSessionState()
     data class Completed(
         val session: TrainingSession? = null
@@ -87,57 +85,72 @@ class TrainingSessionViewModel(
     private fun startObservingSensors() {
         viewModelScope.launch {
             sensorInterface.cadence.collect {
+                val currentState = _sessionState.value as? TrainingSessionState.Active ?: return@collect
+                val currentInterval = currentState.currentInterval
                 currentCadence = it
-                updateSensorState()
+
+                val elapsedMillis = session?.calculateTotalElapsedMillis() ?: return@collect
+                val newSensorData = currentState.cadence + DataPoint(
+                    elapsedMillis / 1000.0f,
+                    currentCadence
+                )
+
+                val cadenceStatus = currentInterval?.let {
+                    compareValue(
+                        actual = currentCadence,
+                        targetMin = it.targetCadence.min,
+                        targetMax = it.targetCadence.max
+                    )
+                } ?: TargetStatus.WithinRange
+
+                _sessionState.value = currentState.copy(
+                    cadenceStatus = cadenceStatus,
+                    cadence = newSensorData
+                )
             }
         }
         viewModelScope.launch {
             sensorInterface.resistance.collect {
+                val currentState = _sessionState.value as? TrainingSessionState.Active ?: return@collect
+                val currentInterval = currentState.currentInterval
                 currentResistance = it
-                updateSensorState()
+
+                val elapsedMillis = session?.calculateTotalElapsedMillis() ?: return@collect
+                val newSensorData = currentState.resistance + DataPoint(
+                    elapsedMillis / 1000.0f,
+                    currentResistance
+                )
+
+                val resistanceStatus = currentInterval?.let {
+                    compareValue(
+                        actual = currentResistance,
+                        targetMin = it.targetResistance.min,
+                        targetMax = it.targetResistance.max
+                    )
+                } ?: TargetStatus.WithinRange
+
+                _sessionState.value = currentState.copy(
+                    resistanceStatus = resistanceStatus,
+                    resistance = newSensorData
+                )
             }
         }
         viewModelScope.launch {
             sensorInterface.power.collect {
+                val currentState = _sessionState.value as? TrainingSessionState.Active ?: return@collect
                 currentPower = it
-                updateSensorState()
+
+                val elapsedMillis = session?.calculateTotalElapsedMillis() ?: return@collect
+                val newSensorData = currentState.power + DataPoint(
+                    elapsedMillis / 1000.0f,
+                    currentPower
+                )
+
+                _sessionState.value = currentState.copy(
+                    power = newSensorData
+                )
             }
         }
-    }
-
-    private fun updateSensorState() {
-        val currentState = _sessionState.value as? TrainingSessionState.Active ?: return
-        val currentInterval = currentState.currentInterval
-
-        val elapsedMillis = session?.calculateTotalElapsedMillis() ?: return
-        val newSensorData = currentState.sensorData + SensorData(
-            elapsedMillis / 1000.0f,
-            currentCadence,
-            currentResistance,
-            currentPower
-        )
-
-        val cadenceStatus = currentInterval?.let {
-            compareValue(
-                actual = currentCadence,
-                targetMin = it.targetCadence.min,
-                targetMax = it.targetCadence.max
-            )
-        } ?: TargetStatus.WithinRange
-
-        val resistanceStatus = currentInterval?.let {
-            compareValue(
-                actual = currentResistance,
-                targetMin = it.targetResistance.min,
-                targetMax = it.targetResistance.max
-            )
-        } ?: TargetStatus.WithinRange
-
-        _sessionState.value = currentState.copy(
-            cadenceStatus = cadenceStatus,
-            resistanceStatus = resistanceStatus,
-            sensorData = newSensorData
-        )
     }
 
     /**

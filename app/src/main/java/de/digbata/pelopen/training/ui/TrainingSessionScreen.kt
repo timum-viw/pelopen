@@ -58,11 +58,9 @@ fun TrainingSessionScreen(
     val resistanceStatus = activeState?.resistanceStatus ?: TargetStatus.WithinRange
     val sessionProgress = activeState?.sessionProgress ?: 0f
     val showIntervalNotification = activeState?.showIntervalChangeNotification ?: false
-    val sensorData = activeState?.sensorData ?: emptyList()
-    val lastSensorData = sensorData.lastOrNull()
-    val cadence = lastSensorData?.cadence ?: 0f
-    val resistance = lastSensorData?.resistance ?: 0f
-    val power = lastSensorData?.power ?: 0f
+    val cadence = activeState?.cadence ?: emptyList()
+    val resistance = activeState?.resistance ?: emptyList()
+    val power = activeState?.power ?: emptyList()
 
     val isPaused = activeState?.isPaused ?: false
     val intervals = workoutPlan.intervals
@@ -294,7 +292,6 @@ fun TrainingSessionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                val sampledSensorData = sensorData.takeLast(200)
                 // Cadence Display
                 Card(modifier = Modifier.weight(1f)) {
                     Column(
@@ -314,8 +311,9 @@ fun TrainingSessionScreen(
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
+                        val currentCadence = cadence?.lastOrNull()?.y ?: 0f
                         Text(
-                            text = "${cadence.toInt()} RPM",
+                            text = "${currentCadence.toInt()} RPM",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = getStatusColor(cadenceStatus)
@@ -327,9 +325,7 @@ fun TrainingSessionScreen(
                         )
                         MetricGraphCard(
                             title = null,
-                            data = sampledSensorData.map {
-                                DataPoint(it.timestamp, it.cadence)
-                            }
+                            data = cadence.takeLast(200)
                         )
                     }
                 }
@@ -355,8 +351,9 @@ fun TrainingSessionScreen(
                             Text(text = "—", style = MaterialTheme.typography.titleMedium)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
+                        val currentResistance = resistance?.lastOrNull()?.y ?: 0f
                         Text(
-                            text = "${resistance.toInt()} %",
+                            text = "${currentResistance.toInt()} %",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = getStatusColor(resistanceStatus)
@@ -368,9 +365,7 @@ fun TrainingSessionScreen(
                         )
                         MetricGraphCard(
                             title = null,
-                            data = sampledSensorData.map {
-                                DataPoint(it.timestamp, it.resistance)
-                            }
+                            data = resistance.takeLast(200)
                         )
                     }
                 }
@@ -385,16 +380,15 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        val currentPower = power?.lastOrNull()?.y ?: 0f
                         Text(
-                            text = "${power.toInt()} W",
+                            text = "${currentPower.toInt()} W",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
                         MetricGraphCard(
                             title = null,
-                            data = sampledSensorData.map {
-                                DataPoint(it.timestamp, it.power)
-                            }
+                            data = power.takeLast(200)
                         )
                     }
                 }
