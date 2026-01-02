@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.spop.peloton.sensors.interfaces.SensorInterface
 import de.digbata.pelopen.training.data.*
-import de.digbata.pelopen.training.ui.DataPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +25,12 @@ class ViewModelFactory(private val application: Application, private val sensorI
     }
 }
 
+data class SensorData (
+    val timestamp: Float,
+    val cadence: Float,
+    val resistance: Float,
+    val power: Float
+)
 /**
  * Sealed class representing the state of a training session
  */
@@ -42,10 +47,7 @@ sealed class TrainingSessionState {
         val cadenceStatus: TargetStatus = TargetStatus.WithinRange,
         val resistanceStatus: TargetStatus = TargetStatus.WithinRange,
         val showIntervalChangeNotification: Boolean = false,
-        val currentCadence: Float = 0f,
-        val currentResistance: Float = 0f,
-        val currentPower: Float = 0f,
-        val sessionData: List<DataPoint> = emptyList()
+        val sensorData: List<SensorData> = emptyList()
     ) : TrainingSessionState()
     data class Completed(
         val session: TrainingSession? = null
@@ -86,7 +88,7 @@ class TrainingSessionViewModel(
         viewModelScope.launch {
             sensorInterface.cadence.collect {
                 currentCadence = it
-                updateSensorState(newCadenceDataPoint = true)
+                updateSensorState()
             }
         }
         viewModelScope.launch {
@@ -103,20 +105,17 @@ class TrainingSessionViewModel(
         }
     }
 
-    private fun updateSensorState(newCadenceDataPoint: Boolean = false) {
+    private fun updateSensorState() {
         val currentState = _sessionState.value as? TrainingSessionState.Active ?: return
         val currentInterval = currentState.currentInterval
 
-        val newSessionData = if (newCadenceDataPoint) {
-            val workoutPlan = session?.workoutPlan ?: return
-            val totalRemainingTime = currentState.totalRemainingTimeSeconds
-            currentState.sessionData + DataPoint(
-                (workoutPlan.totalDurationSeconds * 1000L - totalRemainingTime).toFloat(),
-                currentCadence
-            )
-        } else {
-            currentState.sessionData
-        }
+        val elapsedMillis = session?.calculateTotalElapsedMillis() ?: return
+        val newSensorData = currentState.sensorData + SensorData(
+            elapsedMillis / 1000.0f,
+            currentCadence,
+            currentResistance,
+            currentPower
+        )
 
         val cadenceStatus = currentInterval?.let {
             compareValue(
@@ -137,10 +136,7 @@ class TrainingSessionViewModel(
         _sessionState.value = currentState.copy(
             cadenceStatus = cadenceStatus,
             resistanceStatus = resistanceStatus,
-            currentCadence = currentCadence,
-            currentResistance = currentResistance,
-            currentPower = currentPower,
-            sessionData = newSessionData
+            sensorData = newSensorData
         )
     }
 

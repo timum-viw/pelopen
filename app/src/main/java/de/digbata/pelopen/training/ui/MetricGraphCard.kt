@@ -20,12 +20,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.seconds
 
 data class DataPoint(val x: Float, val y: Float)
 
 @Composable
 fun MetricGraphCard(
-    title: String,
+    title: String? = null,
     durationSeconds: Long = 0,
     data: List<DataPoint> = emptyList(),
     modifier: Modifier = Modifier
@@ -35,12 +36,14 @@ fun MetricGraphCard(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (title != null) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             if (data.size < 2) {
                 Box(
@@ -82,23 +85,19 @@ fun MetricGraphCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "0:00",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-
-                        val durationToDisplay = if (durationSeconds > 0) {
-                            durationSeconds
-                        } else {
-                            (data.maxOfOrNull { it.x } ?: 0f).toLong()
+                        xStart.toInt().seconds.toComponents { minutes, seconds, _ ->
+                            Text(
+                                text = "%d:%02d".format(minutes.toInt(), seconds.toInt()),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
 
-                        val minutes = durationToDisplay / 60
-                        val seconds = durationToDisplay % 60
-                        Text(
-                            text = "%d:%02d".format(minutes.toInt(), seconds.toInt()),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        xEnd.toInt().seconds.toComponents { minutes, seconds, _ ->
+                            Text(
+                                text = "%d:%02d".format(minutes.toInt(), seconds.toInt()),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
                     }
                 }
             }

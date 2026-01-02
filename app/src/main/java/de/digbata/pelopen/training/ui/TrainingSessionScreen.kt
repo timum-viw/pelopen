@@ -58,10 +58,11 @@ fun TrainingSessionScreen(
     val resistanceStatus = activeState?.resistanceStatus ?: TargetStatus.WithinRange
     val sessionProgress = activeState?.sessionProgress ?: 0f
     val showIntervalNotification = activeState?.showIntervalChangeNotification ?: false
-    val sessionData = activeState?.sessionData ?: emptyList()
-    val cadence = activeState?.currentCadence ?: 0f
-    val resistance = activeState?.currentResistance ?: 0f
-    val power = activeState?.currentPower ?: 0f
+    val sensorData = activeState?.sensorData ?: emptyList()
+    val lastSensorData = sensorData.lastOrNull()
+    val cadence = lastSensorData?.cadence ?: 0f
+    val resistance = lastSensorData?.resistance ?: 0f
+    val power = lastSensorData?.power ?: 0f
 
     val isPaused = activeState?.isPaused ?: false
     val intervals = workoutPlan.intervals
@@ -293,6 +294,7 @@ fun TrainingSessionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val sampledSensorData = sensorData.takeLast(200)
                 // Cadence Display
                 Card(modifier = Modifier.weight(1f)) {
                     Column(
@@ -322,6 +324,12 @@ fun TrainingSessionScreen(
                             text = getStatusText(cadenceStatus),
                             style = MaterialTheme.typography.bodySmall,
                             color = getStatusColor(cadenceStatus)
+                        )
+                        MetricGraphCard(
+                            title = null,
+                            data = sampledSensorData.map {
+                                DataPoint(it.timestamp, it.cadence)
+                            }
                         )
                     }
                 }
@@ -358,6 +366,12 @@ fun TrainingSessionScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = getStatusColor(resistanceStatus)
                         )
+                        MetricGraphCard(
+                            title = null,
+                            data = sampledSensorData.map {
+                                DataPoint(it.timestamp, it.resistance)
+                            }
+                        )
                     }
                 }
                 
@@ -375,6 +389,12 @@ fun TrainingSessionScreen(
                             text = "${power.toInt()} W",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
+                        )
+                        MetricGraphCard(
+                            title = null,
+                            data = sampledSensorData.map {
+                                DataPoint(it.timestamp, it.power)
+                            }
                         )
                     }
                 }
