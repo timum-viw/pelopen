@@ -21,11 +21,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+data class DataPoint(val x: Float, val y: Float)
+
 @Composable
 fun MetricGraphCard(
     title: String,
     durationSeconds: Long = 0,
-    data: List<Float> = emptyList(),
+    data: List<DataPoint> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier) {
@@ -40,9 +42,7 @@ fun MetricGraphCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            val validData = data.mapNotNull { it }
-
-            if (validData.size < 2) {
+            if (data.size < 2) {
                 Box(
                     modifier = Modifier.height(120.dp),
                     contentAlignment = Alignment.Center
@@ -50,8 +50,8 @@ fun MetricGraphCard(
                     Text("Not enough data", style = MaterialTheme.typography.bodySmall)
                 }
             } else {
-                val maxValue = validData.maxOrNull() ?: 0f
-                val minValue = validData.minOrNull() ?: 0f
+                val maxValue = data.maxOfOrNull { it.y } ?: 0f
+                val minValue = data.minOfOrNull { it.y } ?: 0f
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
@@ -59,8 +59,15 @@ fun MetricGraphCard(
                         style = MaterialTheme.typography.labelSmall,
                     )
 
+                    val xEnd = if (durationSeconds > 0) {
+                        durationSeconds.toFloat()
+                    } else {
+                        data.maxOfOrNull { it.x } ?: 0f
+                    }
+
                     LineGraph(
                         data = data,
+                        xRange = 0f..xEnd,
                         modifier = Modifier
                             .height(80.dp)
                             .fillMaxWidth()
@@ -80,8 +87,14 @@ fun MetricGraphCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
 
-                        val minutes = durationSeconds / 60
-                        val seconds = durationSeconds % 60
+                        val durationToDisplay = if (durationSeconds > 0) {
+                            durationSeconds
+                        } else {
+                            (data.maxOfOrNull { it.x } ?: 0f).toLong()
+                        }
+
+                        val minutes = durationToDisplay / 60
+                        val seconds = durationToDisplay % 60
                         Text(
                             text = "%d:%02d".format(minutes.toInt(), seconds.toInt()),
                             style = MaterialTheme.typography.labelSmall,
@@ -95,26 +108,27 @@ fun MetricGraphCard(
 
 @Composable
 private fun LineGraph(
-    data: List<Float?>,
+    data: List<DataPoint>,
+    xRange: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
     Canvas(modifier = modifier) {
-        val validData = data.mapNotNull { it }
-        if (validData.size < 2) {
+        if (data.size < 2) {
             // Not enough data to draw a line
             return@Canvas
         }
 
-        val maxValue = validData.maxOrNull() ?: 0f
-        val minValue = validData.minOrNull() ?: 0f
-        val range = (maxValue - minValue).coerceAtLeast(1f)
+        val yMax = data.maxOfOrNull { it.y } ?: 0f
+        val yMin = data.minOfOrNull { it.y } ?: 0f
+        val yRange = (yMax - yMin).coerceAtLeast(1f)
+        val xRangeValue = (xRange.endInclusive - xRange.start).coerceAtLeast(1f)
 
         val path = Path()
 
-        validData.forEachIndexed { index, value ->
-            val x = size.width * (index.toFloat() / (validData.size - 1))
-            val y = size.height * (1 - ((value - minValue) / range))
+        data.forEachIndexed { index, point ->
+            val x = size.width * ((point.x - xRange.start) / xRangeValue)
+            val y = size.height * (1 - ((point.y - yMin) / yRange))
 
             if (index == 0) {
                 path.moveTo(x, y)

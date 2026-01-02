@@ -113,19 +113,23 @@ fun SessionSummaryScreen(
                 MetricGraphCard(
                     title = "Cadence",
                     durationSeconds = durationSeconds,
-                    data = completedSession.dataPoints.map { it.cadence },
+                    data = completedSession.dataPoints.map { DataPoint(it.timestamp / 1000f,it.cadence) },
                     modifier = Modifier.weight(1f)
                 )
                 MetricGraphCard(
                     title = "Resistance",
                     durationSeconds = durationSeconds,
-                    data = completedSession.dataPoints.map { it.resistance },
+                    data = completedSession.dataPoints.map {
+                        DataPoint(it.timestamp / 1000f, it.resistance )
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 MetricGraphCard(
                     title = "Power",
                     durationSeconds = durationSeconds,
-                    data = completedSession.dataPoints.mapNotNull { it.power },
+                    data = completedSession.dataPoints.mapNotNull {
+                        DataPoint(it.timestamp / 1000f, it.power ?: 0f )
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
