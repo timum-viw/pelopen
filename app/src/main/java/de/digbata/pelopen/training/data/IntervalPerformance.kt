@@ -11,6 +11,9 @@ data class IntervalPerformance(
     val dataPoints: List<SessionDataPoint>,
     val averageCadence: Float,
     val averageResistance: Float,
+    val averagePower: Float,
+    val maxPower: Float,
+    val totalPower: Float,
     val cadenceTargetFit: Float, // percentage of time within target (for plan fit analysis)
     val resistanceTargetFit: Float,
     val cadenceStatusSummary: Map<TargetStatus, Int>, // count of each status
@@ -19,4 +22,3 @@ data class IntervalPerformance(
     val wasTooHard: Boolean, // mostly below targets
     val wasAppropriate: Boolean // mostly within targets
 )
-

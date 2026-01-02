@@ -43,6 +43,15 @@ class SessionEvaluator {
             }.toFloat() / totalWeight
         } else 0f
         
+        val overallAveragePower = if (totalWeight > 0) {
+            intervalPerformances.sumOf { 
+                (it.averagePower * it.actualDurationSeconds).toDouble()
+            }.toFloat() / totalWeight
+        } else 0f
+
+        val overallMaxPower = intervalPerformances.maxOfOrNull { it.maxPower } ?: 0f
+        val totalPowerGenerated = intervalPerformances.sumOf { it.totalPower.toDouble() }.toFloat()
+
         // Determine plan difficulty assessment
         val planDifficultyAssessment = assessPlanDifficulty(intervalPerformances)
         
@@ -52,6 +61,9 @@ class SessionEvaluator {
             intervals = intervalPerformances,
             overallCadenceFit = overallCadenceFit,
             overallResistanceFit = overallResistanceFit,
+            overallAveragePower = overallAveragePower,
+            overallMaxPower = overallMaxPower,
+            totalPowerGenerated = totalPowerGenerated,
             planDifficultyAssessment = planDifficultyAssessment
         )
     }
@@ -184,6 +196,9 @@ class SessionEvaluator {
                 dataPoints = emptyList(),
                 averageCadence = 0f,
                 averageResistance = 0f,
+                averagePower = 0f,
+                maxPower = 0f,
+                totalPower = 0f,
                 cadenceTargetFit = 0f,
                 resistanceTargetFit = 0f,
                 cadenceStatusSummary = emptyMap(),
@@ -206,7 +221,10 @@ class SessionEvaluator {
         // Calculate averages
         val averageCadence = dataPoints.map { it.cadence }.average().toFloat()
         val averageResistance = dataPoints.map { it.resistance }.average().toFloat()
-        
+        val averagePower = dataPoints.mapNotNull { it.power }.average().toFloat()
+        val maxPower = dataPoints.maxOf { it.power ?: 0f }
+        val totalPower = dataPoints.sumOf { it.power?.toDouble() ?: 0.0 }.toFloat()
+
         // Count status occurrences
         val cadenceStatusCounts = mutableMapOf<TargetStatus, Int>().apply {
             put(TargetStatus.WithinRange, 0)
@@ -270,6 +288,9 @@ class SessionEvaluator {
             dataPoints = dataPoints,
             averageCadence = averageCadence,
             averageResistance = averageResistance,
+            averagePower = averagePower,
+            maxPower = maxPower,
+            totalPower = totalPower,
             cadenceTargetFit = cadenceTargetFit,
             resistanceTargetFit = resistanceTargetFit,
             cadenceStatusSummary = cadenceStatusCounts.toMap(),
@@ -314,4 +335,3 @@ class SessionEvaluator {
         }
     }
 }
-
