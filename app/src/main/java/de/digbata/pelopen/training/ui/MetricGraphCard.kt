@@ -125,15 +125,35 @@ private fun LineGraph(
 
         val path = Path()
 
-        data.forEachIndexed { index, point ->
+        fun scalePoint(point: DataPoint): Pair<Float, Float> {
             val x = size.width * ((point.x - xRange.start) / xRangeValue)
             val y = size.height * (1 - ((point.y - yMin) / yRange))
+            return x to y
+        }
 
-            if (index == 0) {
-                path.moveTo(x, y)
-            } else {
-                path.lineTo(x, y)
-            }
+        // Start path at the first point
+        val (startX, startY) = scalePoint(data.first())
+        path.moveTo(startX, startY)
+
+        // Use cubicTo for a smooth curve
+        for (i in 0 until data.size - 1) {
+            val p0 = data.getOrElse(i - 1) { data[i] } // Previous point or current if first
+            val p1 = data[i] // Current point
+            val p2 = data[i + 1] // Next point
+            val p3 = data.getOrElse(i + 2) { data[i+1] } // Point after next or next if last
+
+            val (p0x, p0y) = scalePoint(p0)
+            val (p1x, p1y) = scalePoint(p1)
+            val (p2x, p2y) = scalePoint(p2)
+            val (p3x, p3y) = scalePoint(p3)
+
+            // Catmull-Rom spline calculation for control points
+            val cp1x = p1x + (p2x - p0x) / 6f
+            val cp1y = p1y + (p2y - p0y) / 6f
+            val cp2x = p2x - (p3x - p1x) / 6f
+            val cp2y = p2y - (p3y - p1y) / 6f
+
+            path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2x, p2y)
         }
 
         drawPath(
